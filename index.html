@@ -1,0 +1,1707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Darbar-e-Sukoon · The Digital Darbar</title>
+<meta name="description" content="A living, animated Sufi darbar at dusk. Offer a chadar, light a diya, and sit a while." />
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Aref+Ruqaa:wght@400;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Noto+Nastaliq+Urdu:wght@500;700&display=swap" rel="stylesheet" />
+<style>
+/* =====================================================================
+   1. DESIGN TOKENS
+   ===================================================================== */
+:root{
+  --emerald:#0e5a43; --emerald-deep:#083a2c; --marigold:#f39a1e; --saffron:#f6b73c;
+  --rose:#b8323a; --ivory:#fbf1de; --turquoise:#2aa79b; --diya:#ffc861;
+  --night:0;        /* 0 = golden hour … 1 = deep night (driven by JS) */
+  --beat:.74s;      /* qawwali tempo, shortened while hovering the mehfil */
+}
+html,body{height:100%;margin:0;overflow:hidden;background:#141428;}
+body{font-family:'Cormorant Garamond',serif;color:var(--ivory);-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;}
+.title-ur{font-family:'Noto Nastaliq Urdu',serif;}
+.title-en{font-family:'Aref Ruqaa',serif;}
+.gold-text{background:linear-gradient(180deg,#fff4c9 0%,#f7c75c 55%,#c98a1c 100%);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 2px 10px rgba(50,15,0,.55));}
+
+/* =====================================================================
+   2. SKY (fixed behind the world)
+   ===================================================================== */
+#sky{position:fixed;inset:0;z-index:0;overflow:hidden;
+  background:linear-gradient(180deg,#3b3a76 0%,#774a85 20%,#c5646c 40%,#ec8a53 56%,#f7b468 70%,#fcd894 84%,#fde9b8 100%);}
+#skyPar{position:absolute;inset:0;will-change:transform;}
+#sun,#sunHalo{position:absolute;left:24%;top:calc(46% + var(--night) * 40%);border-radius:50%;}
+#sun{width:150px;height:150px;margin:-75px 0 0 -75px;background:radial-gradient(circle,#fffbe8 0%,#ffe6a3 32%,#ffc46b 52%,rgba(255,160,80,0) 72%);}
+#sunHalo{width:1000px;height:640px;margin:-320px 0 0 -500px;background:radial-gradient(ellipse at center,rgba(255,214,140,.55) 0%,rgba(255,170,90,.18) 40%,rgba(255,140,80,0) 70%);}
+#nightSky{position:absolute;inset:0;background:linear-gradient(180deg,#030716 0%,#0a1433 38%,#16224d 66%,#2a2b55 86%,#3a3358 100%);opacity:var(--night);}
+#stars{position:absolute;inset:0 0 38% 0;opacity:calc(var(--night) * 1.6 - .45);}
+.star{position:absolute;width:2px;height:2px;border-radius:50%;background:#fff8e1;box-shadow:0 0 6px rgba(255,248,225,.9);animation:twinkle 4s ease-in-out infinite;}
+#moon{position:absolute;right:14%;top:9%;width:58px;height:58px;border-radius:50%;box-shadow:13px 9px 0 0 #fff3cf;opacity:calc(var(--night) * 1.8 - .55);filter:drop-shadow(0 0 16px rgba(255,240,200,.55));transform:rotate(-20deg);}
+.cloud{position:absolute;left:0;border-radius:50%;background:radial-gradient(ellipse at 50% 60%,rgba(255,216,192,.7),rgba(255,190,170,.25) 55%,rgba(255,190,170,0) 72%);animation:drift linear infinite;}
+.bird{position:absolute;left:0;width:18px;height:8px;animation:drift linear infinite;}
+.bird i{position:absolute;top:0;width:10px;height:7px;border-top:1.6px solid rgba(55,35,55,.55);border-radius:60% 60% 0 0;animation:wing 1.2s ease-in-out infinite;}
+.bird i:first-child{left:0;transform-origin:100% 100%}.bird i:last-child{right:0;transform-origin:0 100%}
+
+/* =====================================================================
+   3. WORLD (2400 × 900 design units, scaled to fit the viewport height)
+   ===================================================================== */
+#viewport{position:fixed;inset:0;z-index:1;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;cursor:grab;overscroll-behavior:contain;}
+#viewport::-webkit-scrollbar{display:none}
+#viewport.dragging{cursor:grabbing}
+#sizer{position:relative;height:100%;overflow:hidden;}
+#world{position:absolute;left:0;bottom:0;width:2400px;height:900px;transform-origin:0 100%;}
+.layer{position:absolute;left:0;top:0;width:2400px;height:900px;pointer-events:none;}
+.layer>svg{display:block;width:100%;height:100%;overflow:visible;}
+.par{will-change:transform;}
+.hit{pointer-events:auto;cursor:pointer;}
+#L-warm{background:radial-gradient(ellipse 55% 70% at 22% 45%,rgba(255,186,96,.30),rgba(255,160,80,.08) 55%,transparent 75%);opacity:calc(1 - var(--night) * 1.8);}
+#L-dim{background:linear-gradient(180deg,rgba(10,16,52,.3) 0%,rgba(10,16,52,.7) 38%,#0a1034 52%,#070b26 100%);opacity:calc(var(--night) * .62);}
+.glow{opacity:calc(.3 + var(--night) * .7);}
+.glow-strong{opacity:calc(.55 + var(--night) * .45);}
+.win-glow{opacity:calc(.15 + var(--night) * .85);}
+
+/* load-in: each layer fades up in turn */
+.reveal{opacity:0;transition:opacity 1.8s ease;}
+body.loaded .reveal{opacity:1;}
+
+/* =====================================================================
+   4. CHARACTER STATE STYLES
+   ===================================================================== */
+.namaz .pose{opacity:0;transition:opacity .8s ease;}
+.namaz[data-pose="qiyam"] .p-qiyam,.namaz[data-pose="ruku"] .p-ruku,
+.namaz[data-pose="sujood"] .p-sujood,.namaz[data-pose="jalsa"] .p-jalsa{opacity:1;}
+.cat .cs{opacity:0;transition:opacity .6s ease;}
+.cat[data-state="walk"] .c-walk,.cat[data-state="stretch"] .c-walk{opacity:1;}
+.cat[data-state="sit"] .c-sit,.cat[data-state="nap"] .c-nap{opacity:1;}
+.cat:not([data-state="walk"]) .leg{animation-play-state:paused !important;}
+.cat[data-state="stretch"] .c-body{animation:catStretch 2.8s ease-in-out;transform-origin:-10px 0;}
+.pigeon .pg-fly{opacity:0;}
+.pigeon.flying .pg-fly{opacity:1;}
+.pigeon.flying .pg-ground{opacity:0;}
+.idle .limb{animation-play-state:paused !important;}
+#qawwali.intense{--beat:.44s;}
+.chadar-new{animation:unfold 2.8s cubic-bezier(.22,.9,.3,1) both;transform-origin:1200px 540px;}
+.petal{transform-box:fill-box;transform-origin:center;animation:petalDrop 2.4s ease-out both;}
+.lit-in{animation:litIn 1.2s ease-out both;transform-box:fill-box;transform-origin:50% 100%;}
+.coin-drop{animation:coinDrop 1.25s cubic-bezier(.55,0,.8,.4) forwards;}
+.coin-spin{animation:coinSpin .32s linear infinite;transform-origin:1102px 597px;}
+.spark{transform-box:fill-box;transform-origin:center;animation:sparkle .9s ease-out forwards;}
+.jiggle{animation:jiggle .5s ease-in-out;transform-origin:1102px 650px;}
+.ledge-hint{animation:ledgeHint 1.6s ease-in-out 2;}
+
+/* =====================================================================
+   5. KEYFRAMES (all slow and gentle)
+   ===================================================================== */
+@keyframes twinkle{0%,100%{opacity:.25}50%{opacity:1}}
+@keyframes drift{from{transform:translateX(-35vw)}to{transform:translateX(135vw)}}
+@keyframes wing{50%{transform:scaleY(.35)}}
+@keyframes sway{0%,100%{transform:rotate(-2.5deg)}50%{transform:rotate(2.5deg)}}
+@keyframes swaySoft{0%,100%{transform:rotate(-1deg)}50%{transform:rotate(1.2deg)}}
+@keyframes swayBig{0%,100%{transform:rotate(-6deg)}50%{transform:rotate(6deg)}}
+@keyframes lanternSwing{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(4deg)}}
+@keyframes flicker{0%,100%{transform:scale(1,1)}20%{transform:scale(.9,1.1) skewX(3deg)}45%{transform:scale(1.06,.94)}70%{transform:scale(.94,1.08) skewX(-3deg)}85%{transform:scale(1.02,.97)}}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
+@keyframes waterFlow{to{stroke-dashoffset:-24}}
+@keyframes ripple{0%{transform:scale(.25);opacity:.8}100%{transform:scale(1.35);opacity:0}}
+@keyframes steam{0%{transform:translate(0,0) scale(.5);opacity:0}15%{opacity:.5}100%{transform:translate(var(--dx,10px),-150px) scale(2);opacity:0}}
+@keyframes leafFall{0%{transform:translate(0,0) rotate(0);opacity:0}8%{opacity:.95}100%{transform:translate(var(--dx,60px),var(--dy,260px)) rotate(var(--rot,540deg));opacity:0}}
+@keyframes clapL{0%,100%{transform:rotate(0)}50%{transform:rotate(24deg)}}
+@keyframes clapR{0%,100%{transform:rotate(0)}50%{transform:rotate(-24deg)}}
+@keyframes bob{0%,100%{transform:rotate(-7deg)}50%{transform:rotate(7deg)}}
+@keyframes nod{0%,100%{transform:rotate(0)}50%{transform:rotate(10deg)}}
+@keyframes weep{0%,100%{transform:translateY(0)}18%{transform:translateY(.9px)}34%{transform:translateY(0)}50%{transform:translateY(1px)}64%{transform:translateY(0)}}
+@keyframes lips{0%,100%{transform:scaleY(.35)}50%{transform:scaleY(1.4)}}
+@keyframes tap{0%,100%{transform:translateY(0)}50%{transform:translateY(-3.5px)}}
+@keyframes bellows{0%,100%{transform:scaleX(1)}50%{transform:scaleX(1.6)}}
+@keyframes pump{0%,100%{transform:rotate(-6deg)}50%{transform:rotate(8deg)}}
+@keyframes singArm{0%,100%{transform:rotate(12deg)}50%{transform:rotate(-28deg)}}
+@keyframes dhamaal{0%,100%{transform:rotate(-13deg)}50%{transform:rotate(13deg)}}
+@keyframes headRoll{0%,100%{transform:rotate(-22deg)}50%{transform:rotate(22deg)}}
+@keyframes armsUp{0%,100%{transform:rotate(-10deg)}50%{transform:rotate(12deg)}}
+@keyframes skirtFlare{0%,100%{transform:scaleX(1)}50%{transform:scaleX(1.09)}}
+@keyframes pleats{to{transform:translateX(-16px)}}
+@keyframes whirl{0%,100%{transform:scaleX(1)}50%{transform:scaleX(.93)}}
+@keyframes flap{0%,100%{transform:scaleY(1)}50%{transform:scaleY(-.7)}}
+@keyframes peck{0%,72%,100%{transform:rotate(0)}80%{transform:rotate(42deg)}88%{transform:rotate(8deg)}94%{transform:rotate(38deg)}}
+@keyframes run{0%,100%{transform:rotate(28deg)}50%{transform:rotate(-28deg)}}
+@keyframes walk{0%,100%{transform:rotate(14deg)}50%{transform:rotate(-14deg)}}
+@keyframes tail{0%,100%{transform:rotate(-10deg)}50%{transform:rotate(14deg)}}
+@keyframes catStretch{0%,100%{transform:none}45%,60%{transform:scaleX(1.16) skewX(-10deg)}}
+@keyframes flagWave{0%,100%{transform:skewY(0) scaleX(1)}50%{transform:skewY(7deg) scaleX(.9)}}
+@keyframes eat{0%,55%,100%{transform:rotate(0)}70%,80%{transform:rotate(92deg)}}
+@keyframes scrub{0%,100%{transform:rotate(0)}50%{transform:rotate(-18deg)}}
+@keyframes serve{0%,100%{transform:rotate(0)}50%{transform:rotate(-40deg)}}
+@keyframes stir{0%,100%{transform:translateX(-5px) rotate(-6deg)}50%{transform:translateX(5px) rotate(6deg)}}
+@keyframes fire{0%,100%{transform:scaleY(1);opacity:.9}50%{transform:scaleY(1.25);opacity:1}}
+@keyframes unfold{0%{transform:translateY(-48px) scaleY(.04);opacity:0}30%{opacity:1}68%{transform:translateY(2px) scaleY(1.05)}84%{transform:translateY(-1px) scaleY(.99)}100%{transform:none;opacity:1}}
+@keyframes petalDrop{from{transform:translate(var(--px,0px),-70px) rotate(var(--pr,220deg));opacity:0}25%{opacity:1}to{transform:none;opacity:1}}
+@keyframes litIn{0%{transform:scale(0);opacity:0}60%{transform:scale(1.2);opacity:1}100%{transform:scale(1)}}
+@keyframes coinDrop{0%{transform:translateY(-120px);opacity:0}12%{opacity:1}80%{transform:translateY(-1px);opacity:1}100%{transform:translateY(3px);opacity:0}}
+@keyframes coinSpin{0%,100%{transform:scaleX(1)}50%{transform:scaleX(.12)}}
+@keyframes sparkle{0%{transform:translate(0,0) scale(.2);opacity:1}100%{transform:translate(var(--dx),var(--dy)) scale(1);opacity:0}}
+@keyframes jiggle{0%,100%{transform:rotate(0)}25%{transform:rotate(-2deg)}60%{transform:rotate(1.5deg)}}
+@keyframes ledgeHint{0%,100%{filter:none}50%{filter:drop-shadow(0 0 10px #ffd27a) brightness(1.15)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+
+/* =====================================================================
+   6. UI
+   ===================================================================== */
+.ui-reveal{opacity:0;transition:opacity 1.6s ease 3s, transform 1.6s ease 3s;transform:translateY(12px);}
+body.loaded .ui-reveal{opacity:1;transform:none;}
+.ctrl{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-width:56px;height:56px;padding:0 10px;border-radius:9999px;color:#fdf3dc;transition:background .4s ease, transform .4s ease;}
+.ctrl:hover{background:rgba(255,236,190,.12);}
+.ctrl:active{transform:scale(.95);}
+.ctrl:focus-visible{outline:2px solid #f6c45a;outline-offset:2px;}
+.ctrl[aria-pressed="true"]{background:rgba(246,196,90,.2);}
+.ctrl svg{width:22px;height:22px;}
+.badge{position:absolute;top:2px;right:4px;min-width:18px;height:18px;padding:0 5px;border-radius:9999px;background:#f39a1e;color:#2a1405;font:700 11px/18px 'Cormorant Garamond',serif;text-align:center;box-shadow:0 0 10px rgba(243,154,30,.6);}
+.swatch{width:34px;height:34px;border-radius:9999px;border:2px solid rgba(255,240,200,.55);box-shadow:inset 0 -6px 0 rgba(0,0,0,.2), 0 0 0 0 rgba(246,196,90,.5);transition:transform .3s ease, box-shadow .3s ease;}
+.swatch:hover,.swatch:focus-visible{transform:translateY(-3px);box-shadow:inset 0 -6px 0 rgba(0,0,0,.2), 0 0 14px 2px rgba(246,196,90,.55);outline:none;}
+#toast{transition:opacity .8s ease, transform .8s ease;}
+
+/* =====================================================================
+   7. REDUCED MOTION — pause decorative drift, everything else is slowed in JS
+   ===================================================================== */
+@media (prefers-reduced-motion: reduce){
+  .cloud,.bird,.bird i,.star,.leaf{animation:none !important;}
+  .reveal,.ui-reveal{transition-duration:.6s !important;transition-delay:0s !important;}
+}
+</style>
+</head>
+<body>
+
+<!-- ===================== OPENING VEIL ===================== -->
+<div id="veil" class="fixed inset-0 z-50 flex items-center justify-center bg-[#0b0f1f] transition-opacity duration-[1800ms]" aria-hidden="true">
+  <p class="title-ur text-amber-200/80 text-2xl sm:text-3xl leading-[2.4]" dir="rtl" lang="ur">بِسْمِ اللّٰہِ الرَّحْمٰنِ الرَّحِیْم</p>
+</div>
+<script>
+/* Failsafe: never leave a visitor stuck on the opening veil, even if the scene script fails. */
+setTimeout(function () {
+  document.body.classList.add('loaded');
+  var v = document.getElementById('veil');
+  if (v) { v.style.opacity = '0'; v.style.pointerEvents = 'none'; setTimeout(function () { v.remove(); }, 2000); }
+}, 7000);
+</script>
+
+<!-- ===================== SKY ===================== -->
+<div id="sky" aria-hidden="true">
+  <div id="skyPar">
+    <div id="sunHalo"></div><div id="sun"></div>
+    <div id="clouds" class="absolute inset-0"></div>
+    <div id="birds" class="absolute inset-0"></div>
+  </div>
+  <div id="nightSky"></div>
+  <div id="stars"></div>
+  <div id="moon"></div>
+</div>
+
+<!-- ===================== WORLD (scrollable, parallax layers) ===================== -->
+<main id="viewport" tabindex="0" aria-label="The darbar. Drag, swipe or scroll sideways to explore.">
+ <div id="sizer">
+  <div id="world">
+
+   <!-- Layer 1: distant city & tree line (slowest parallax) -->
+   <div class="layer par reveal" id="L-far" style="transition-delay:.3s"><svg id="svgFar" viewBox="0 0 2400 900" preserveAspectRatio="none"></svg></div>
+
+   <!-- Layer 2: courtyard wall, ground, shrine, fountain -->
+   <div class="layer reveal" id="L-mid" style="transition-delay:.8s">
+    <svg id="svgMid" viewBox="0 0 2400 900" preserveAspectRatio="none">
+     <defs>
+      <linearGradient id="gGrass" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5f8c47"/><stop offset=".35" stop-color="#3f7840"/><stop offset="1" stop-color="#23573a"/></linearGradient>
+      <linearGradient id="gMarble" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4e9d5"/><stop offset="1" stop-color="#d8c5a6"/></linearGradient>
+      <linearGradient id="gWall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f0d6ae"/><stop offset="1" stop-color="#d6b487"/></linearGradient>
+      <linearGradient id="gIvory" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff7e8"/><stop offset=".55" stop-color="#f6ead4"/><stop offset="1" stop-color="#dfcaa8"/></linearGradient>
+      <linearGradient id="gEarth" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c49a6c"/><stop offset="1" stop-color="#94673f"/></linearGradient>
+      <radialGradient id="gDome" cx=".34" cy=".34" r=".85"><stop offset="0" stop-color="#63c493"/><stop offset=".45" stop-color="#17805a"/><stop offset="1" stop-color="#053a29"/></radialGradient>
+      <radialGradient id="gInterior" cx=".5" cy=".8" r=".8"><stop offset="0" stop-color="#ffd88e"/><stop offset=".4" stop-color="#c06c30"/><stop offset="1" stop-color="#3a1b10"/></radialGradient>
+      <linearGradient id="gGold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff0b0"/><stop offset=".5" stop-color="#e2b34a"/><stop offset="1" stop-color="#a87618"/></linearGradient>
+      <linearGradient id="gCopper" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#6e3518"/><stop offset=".33" stop-color="#d98d4e"/><stop offset=".55" stop-color="#b8692f"/><stop offset="1" stop-color="#4f240f"/></linearGradient>
+      <linearGradient id="gWater" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8adbd3"/><stop offset="1" stop-color="#26908f"/></linearGradient>
+      <radialGradient id="gSteam"><stop offset="0" stop-color="#fffaf0" stop-opacity=".8"/><stop offset="1" stop-color="#fffaf0" stop-opacity="0"/></radialGradient>
+      <pattern id="pTiles" width="12" height="12" patternUnits="userSpaceOnUse"><rect width="12" height="12" fill="#1f8f86"/><path d="M6,0 L12,6 L6,12 L0,6Z" fill="#45b9ac"/><circle cx="6" cy="6" r="1.7" fill="#f6e7c4"/></pattern>
+      <pattern id="pTilesDk" width="10" height="10" patternUnits="userSpaceOnUse"><rect width="10" height="10" fill="#0d5a50"/><path d="M5,0 L10,5 L5,10 L0,5Z" fill="#1f8f86"/></pattern>
+      <pattern id="pJali" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="#5e3219"/><circle cx="4" cy="4" r="2.7" fill="#ffcf7a"/></pattern>
+      <pattern id="pMerlon" width="12" height="9" patternUnits="userSpaceOnUse"><path d="M1,9 Q1,3 6,0 Q11,3 11,9Z" fill="#f4e8d2"/></pattern>
+      <pattern id="pWallArch" width="64" height="72" patternUnits="userSpaceOnUse" y="505"><path d="M14,72 L14,32 Q14,13 32,6 Q50,13 50,32 L50,72Z" fill="#d3b285"/><path d="M20,72 L20,34 Q20,19 32,13 Q44,19 44,34 L44,72Z" fill="#c29d6f" opacity=".75"/></pattern>
+      <pattern id="pFloor" width="44" height="22" patternUnits="userSpaceOnUse"><path d="M0,22 H44 M44,0 V22" stroke="#c7b38e" stroke-width=".8" opacity=".55" fill="none"/></pattern>
+      <pattern id="pDrumArch" width="19" height="44" patternUnits="userSpaceOnUse" x="1104" y="298"><path d="M5,40 V20 Q5,10 9.5,7 Q14,10 14,20 V40Z" fill="#b97f48" opacity=".6"/></pattern>
+      <pattern id="pBrick" width="16" height="8" patternUnits="userSpaceOnUse"><rect width="16" height="8" fill="#9c4a2c"/><path d="M0,8 H16 M8,0 V8" stroke="#6e301b" stroke-width="1"/></pattern>
+
+      <!-- reusable minaret (centered on x=0, base at y=600) -->
+      <g id="minaret">
+       <path d="M-16,600 L-11,215 L11,215 L16,600Z" fill="url(#gIvory)"/>
+       <rect x="-16" y="562" width="32" height="38" fill="url(#pTiles)"/>
+       <rect x="-14.5" y="480" width="29" height="7" fill="url(#pTilesDk)"/>
+       <rect x="-13" y="372" width="26" height="6" fill="url(#pTilesDk)"/>
+       <rect x="-3" y="515" width="6" height="14" rx="3" fill="#6b4226" opacity=".55"/>
+       <rect x="-3" y="395" width="6" height="13" rx="3" fill="#6b4226" opacity=".55"/>
+       <path d="M-22,441 H22 L17,453 H-17Z" fill="#e8d8bb"/>
+       <rect x="-22" y="430" width="44" height="11" fill="#f6ecd9"/>
+       <rect x="-20" y="432" width="40" height="6" fill="url(#pTilesDk)"/>
+       <path d="M-19,301 H19 L14,312 H-14Z" fill="#e8d8bb"/>
+       <rect x="-19" y="291" width="38" height="10" fill="#f6ecd9"/>
+       <rect x="-17" y="293" width="34" height="5" fill="url(#pTilesDk)"/>
+       <rect x="-12" y="190" width="24" height="26" fill="#f6ecd9"/>
+       <path d="M-6,216 V202 Q0,194 6,202 V216Z" fill="#4b2a1a"/>
+       <rect x="-15" y="186" width="30" height="5" fill="#e8d8bb"/>
+       <path d="M-14,186 Q-14,166 0,155 Q14,166 14,186Z" fill="url(#gDome)"/>
+       <line x1="0" y1="156" x2="0" y2="134" stroke="#e2b34a" stroke-width="2"/>
+       <circle cy="146" r="2.6" fill="#e2b34a"/>
+       <path d="M-5,134 A5,5 0 0 0 5,134 A5,2.4 0 0 1 -5,134Z" fill="#e2b34a"/>
+      </g>
+     </defs>
+
+     <!-- courtyard boundary wall with arched niches -->
+     <rect x="0" y="498" width="2400" height="82" fill="url(#gWall)"/>
+     <rect x="0" y="505" width="2400" height="72" fill="url(#pWallArch)"/>
+     <rect x="0" y="489" width="2400" height="10" fill="url(#pMerlon)"/>
+     <rect x="0" y="496" width="2400" height="5" fill="#e3c79c"/>
+     <rect x="0" y="572" width="2400" height="8" fill="url(#pTilesDk)" opacity=".8"/>
+
+     <!-- ground: grass, marble courtyard, earthen langar yard -->
+     <rect x="0" y="578" width="2400" height="322" fill="url(#gGrass)"/>
+     <path d="M925,580 L1995,580 L2030,900 L885,900Z" fill="url(#gMarble)"/>
+     <path d="M925,580 L1995,580 L2030,900 L885,900Z" fill="url(#pFloor)"/>
+     <path d="M2005,580 L2400,580 L2400,900 L2040,900Z" fill="url(#gEarth)"/>
+     <!-- marble walkway through the garden -->
+     <path d="M560,822 L905,780 L900,812 L540,860Z" fill="#eadcc1"/>
+     <path d="M560,822 L905,780" stroke="#c9b48f" stroke-width="2"/>
+     <!-- sema platform & qawwali sheet -->
+     <ellipse cx="180" cy="742" rx="150" ry="40" fill="#cdbb9b"/>
+     <ellipse cx="180" cy="737" rx="146" ry="37" fill="#f1e7d4"/>
+     <ellipse cx="180" cy="737" rx="120" ry="28" fill="none" stroke="#c9a24a" stroke-width="1.5" opacity=".7"/>
+     <path d="M352,678 L688,678 L712,748 L330,748Z" fill="#f7f3ea"/>
+     <path d="M352,678 L688,678 L712,748 L330,748Z" fill="none" stroke="#d9cfba" stroke-width="2"/>
+     <path d="M440,690 L600,690 L612,736 L428,736Z" fill="#8d1f2b" opacity=".85"/>
+     <path d="M448,695 L592,695 L602,731 L437,731Z" fill="none" stroke="#e2b34a" stroke-width="1.5" stroke-dasharray="4 3"/>
+
+     <!-- ============ THE SHRINE (mazar), centred on x = 1200 ============ -->
+     <g id="shrine">
+      <ellipse cx="1200" cy="618" rx="260" ry="14" fill="#000" opacity=".12"/>
+      <rect x="995" y="588" width="410" height="26" fill="url(#gMarble)"/>
+      <rect x="995" y="588" width="410" height="4" fill="#fffaf0"/>
+      <rect x="995" y="598" width="410" height="12" fill="url(#pTilesDk)" opacity=".5"/>
+      <rect x="1140" y="612" width="120" height="8" fill="#f1e6d0"/>
+      <rect x="1128" y="619" width="144" height="9" fill="#e4d4b6"/>
+      <use href="#minaret" x="985"/>
+      <use href="#minaret" x="1415"/>
+
+      <!-- main block -->
+      <rect x="1040" y="362" width="320" height="228" fill="url(#gIvory)"/>
+      <rect x="1040" y="556" width="320" height="32" fill="url(#pTiles)"/>
+      <rect x="1040" y="362" width="320" height="12" fill="url(#pTiles)"/>
+      <rect x="1040" y="374" width="320" height="2" fill="#c9a24a"/>
+      <rect x="1040" y="362" width="12" height="226" fill="#eee0c6"/>
+      <rect x="1348" y="362" width="12" height="226" fill="#dccaa9"/>
+      <rect x="1032" y="348" width="336" height="16" fill="#f4e8d2"/>
+      <rect x="1032" y="361" width="336" height="3" fill="#cfb68a"/>
+      <rect x="1032" y="339" width="336" height="9" fill="url(#pMerlon)"/>
+
+      <!-- side jali windows & upper niches -->
+      <path d="M1064,552 V470 Q1064,446 1086,437 Q1108,446 1108,470 V552Z" fill="url(#pJali)" stroke="#1f8f86" stroke-width="3"/>
+      <path d="M1292,552 V470 Q1292,446 1314,437 Q1336,446 1336,470 V552Z" fill="url(#pJali)" stroke="#1f8f86" stroke-width="3"/>
+      <path d="M1070,425 V400 Q1070,388 1086,383 Q1102,388 1102,400 V425Z" fill="#7a4a2a" opacity=".75"/>
+      <path d="M1298,425 V400 Q1298,388 1314,383 Q1330,388 1330,400 V425Z" fill="#7a4a2a" opacity=".75"/>
+
+      <!-- central portal (pishtaq) -->
+      <rect x="1118" y="380" width="164" height="210" fill="#fbf4e6"/>
+      <rect x="1121.5" y="383.5" width="157" height="206" fill="none" stroke="url(#pTiles)" stroke-width="7"/>
+      <rect x="1130" y="390" width="140" height="9" fill="#0e5a43"/>
+      <path d="M1134,394.5 h132" stroke="#e2b34a" stroke-width="2" stroke-dasharray="6 3 1 3"/>
+      <circle cx="1142" cy="410" r="5" fill="url(#gGold)"/><circle cx="1258" cy="410" r="5" fill="url(#gGold)"/>
+      <path d="M1140,590 V478 Q1140,428 1200,408 Q1260,428 1260,478 V590Z" fill="url(#gInterior)"/>
+      <path d="M1152,560 V484 Q1152,442 1200,425 Q1248,442 1248,484 V560Z" fill="url(#pJali)" opacity=".28"/>
+      <path d="M1136,590 V476 Q1136,424 1200,403 Q1264,424 1264,476 V590" fill="none" stroke="#c9a24a" stroke-width="2"/>
+
+      <!-- the saint's grave (taweez) under layered chadars -->
+      <rect x="1148" y="566" width="104" height="24" rx="2" fill="#efe2c8"/>
+      <rect x="1148" y="566" width="104" height="5" fill="#fff7e8"/>
+      <path d="M1156,568 Q1158,544 1200,541 Q1242,544 1244,568Z" fill="#0b5e44"/>
+      <path d="M1151,580 L1151,571 Q1153,540 1200,536 Q1247,540 1249,571 L1249,580 Q1200,586 1151,580Z" fill="#0f6e4e"/>
+      <path d="M1151,577 Q1200,583 1249,577" stroke="#e9c25a" stroke-width="2.4" fill="none"/>
+      <path d="M1164,576 Q1166,546 1200,543 Q1234,546 1236,576 Q1200,580 1164,576Z" fill="#a3202c"/>
+      <path d="M1164,573 Q1200,577 1236,573" stroke="#e9c25a" stroke-width="1.8" fill="none"/>
+      <path d="M1172,560 Q1200,552 1228,560" stroke="#e9c25a" stroke-width="1.2" fill="none" stroke-dasharray="2 2.5"/>
+      <g id="chadars"></g>
+      <path d="M1158,562 Q1200,578 1242,562" stroke="#f39a1e" stroke-width="4.5" fill="none" stroke-dasharray="0 5" stroke-linecap="round"/>
+      <path d="M1170,553 Q1200,566 1230,553" stroke="#ffd04a" stroke-width="3.6" fill="none" stroke-dasharray="0 4.6" stroke-linecap="round"/>
+      <g id="petals"></g>
+
+      <!-- corner chhatris -->
+      <g id="chhatri"><rect x="1039" y="312" width="26" height="28" fill="#f6ecd9"/><path d="M1045,340 V326 Q1052,318 1059,326 V340Z" fill="#5b3420"/><rect x="1036" y="308" width="32" height="5" fill="#e8d8bb"/><path d="M1037,308 Q1037,288 1052,278 Q1067,288 1067,308Z" fill="url(#gDome)"/><line x1="1052" y1="279" x2="1052" y2="230" stroke="#8a6a3a" stroke-width="1.6"/></g>
+      <use href="#chhatri" x="296"/>
+      <path d="M1053,232 Q1067,228 1083,234 L1083,250 Q1067,245 1053,249Z" fill="#127a52" style="animation:flagWave 3.2s ease-in-out infinite;transform-origin:1053px 240px"/>
+      <path d="M1349,232 Q1363,228 1379,234 L1379,250 Q1363,245 1349,249Z" fill="#127a52" style="animation:flagWave 3.6s ease-in-out -1s infinite;transform-origin:1349px 240px"/>
+
+      <!-- drum & onion dome -->
+      <rect x="1104" y="298" width="192" height="44" fill="url(#gIvory)"/>
+      <rect x="1104" y="298" width="192" height="44" fill="url(#pDrumArch)"/>
+      <rect x="1104" y="336" width="192" height="6" fill="url(#pTiles)"/>
+      <rect x="1098" y="292" width="204" height="7" fill="#e8d8bb"/>
+      <path d="M1100,294 C1080,262 1080,212 1122,184 C1152,164 1186,152 1200,128 C1214,152 1248,164 1278,184 C1320,212 1320,262 1300,294Z" fill="url(#gDome)"/>
+      <path d="M1150,294 C1138,240 1160,190 1200,130 M1250,294 C1262,240 1240,190 1200,130 M1200,294 V130" stroke="#06402d" stroke-width="1.2" opacity=".45" fill="none"/>
+      <path d="M1118,252 C1116,216 1138,193 1168,176" stroke="#a6e6c2" stroke-width="6" opacity=".35" stroke-linecap="round" fill="none"/>
+      <rect x="1100" y="289" width="200" height="5" fill="url(#gGold)"/>
+      <path d="M1186,134 Q1200,116 1214,134Z" fill="url(#gGold)"/>
+      <line x1="1200" y1="128" x2="1200" y2="82" stroke="#e2b34a" stroke-width="3"/>
+      <circle cx="1200" cy="114" r="5" fill="url(#gGold)"/><circle cx="1200" cy="102" r="4" fill="url(#gGold)"/><circle cx="1200" cy="92" r="3.2" fill="url(#gGold)"/>
+      <path d="M1192,80 A8,8 0 0 0 1208,80 A8,4 0 0 1 1192,80Z" fill="#f0c55a"/>
+
+      <!-- marigold & rose garlands on the portal -->
+      <path d="M1118,384 Q1159,422 1200,386 Q1241,422 1282,384" stroke="#f39a1e" stroke-width="5" fill="none" stroke-dasharray="0 5.5" stroke-linecap="round" style="animation:swaySoft 7s ease-in-out infinite;transform-origin:1200px 384px"/>
+      <path d="M1118,384 Q1159,416 1200,386 Q1241,416 1282,384" stroke="#ffd04a" stroke-width="3.8" fill="none" stroke-dasharray="0 5" stroke-linecap="round" stroke-dashoffset="2.5"/>
+      <path d="M1124,388 V585 M1276,388 V585" stroke="#f39a1e" stroke-width="4.2" fill="none" stroke-dasharray="0 5" stroke-linecap="round"/>
+      <path d="M1124,390 V585 M1276,390 V585" stroke="#c0392b" stroke-width="3.6" fill="none" stroke-dasharray="0 15" stroke-linecap="round"/>
+     </g>
+
+     <!-- chanda (donation) box near the entrance — clickable -->
+     <g id="chanda" class="hit" role="button" tabindex="0" aria-label="Donation box: drop a coin">
+      <ellipse cx="1102" cy="653" rx="26" ry="5" fill="#000" opacity=".2"/>
+      <rect x="1086" y="634" width="4" height="19" fill="#5a3a22"/><rect x="1114" y="634" width="4" height="19" fill="#5a3a22"/>
+      <rect x="1080" y="598" width="44" height="40" rx="3" fill="#0f6a4a"/>
+      <rect x="1083" y="603" width="38" height="32" rx="2" fill="none" stroke="#e2b34a" stroke-width="1.2"/>
+      <rect x="1078" y="593" width="48" height="7" rx="2" fill="#13805a"/>
+      <rect x="1092" y="595.5" width="20" height="2.6" rx="1.2" fill="#04261a"/>
+      <path d="M1097,612 A6,6 0 1 0 1104,620 A4.6,4.6 0 1 1 1097,612Z" fill="#f0c55a"/>
+      <text x="1102" y="632" font-family="Noto Nastaliq Urdu, serif" font-size="6.5" fill="#f6d77a" text-anchor="middle">نذرانہ</text>
+     </g>
+
+     <!-- fountain with flowing water -->
+     <g id="fountain">
+      <ellipse cx="805" cy="756" rx="80" ry="20" fill="#000" opacity=".15"/>
+      <ellipse cx="805" cy="750" rx="74" ry="19" fill="#cdb998"/>
+      <ellipse cx="805" cy="742" rx="74" ry="19" fill="#efe4cf"/>
+      <ellipse cx="805" cy="741" rx="65" ry="14.5" fill="url(#gWater)"/>
+      <ellipse cx="805" cy="741" rx="22" ry="4.8" fill="none" stroke="#e8fffb" stroke-width="1.2" style="animation:ripple 3.2s ease-out infinite;transform-origin:805px 741px"/>
+      <ellipse cx="805" cy="741" rx="22" ry="4.8" fill="none" stroke="#e8fffb" stroke-width="1.2" style="animation:ripple 3.2s ease-out -1.06s infinite;transform-origin:805px 741px"/>
+      <ellipse cx="805" cy="741" rx="22" ry="4.8" fill="none" stroke="#e8fffb" stroke-width="1.2" style="animation:ripple 3.2s ease-out -2.13s infinite;transform-origin:805px 741px"/>
+      <path d="M797,741 L800,702 H810 L813,741Z" fill="#e6d8be"/>
+      <ellipse cx="805" cy="702" rx="24" ry="6" fill="#efe4cf"/>
+      <ellipse cx="805" cy="701" rx="19" ry="3.6" fill="#86d6ce"/>
+      <rect x="803" y="684" width="4" height="17" fill="#e6d8be"/>
+      <g fill="none" stroke-linecap="round">
+       <path d="M805,684 V662 M805,664 Q790,664 786,699 M805,664 Q820,664 824,699 M782,703 Q774,712 772,738 M828,703 Q836,712 838,738" stroke="#dff7f4" stroke-width="3.4" opacity=".35"/>
+       <path d="M805,684 V662 M805,664 Q790,664 786,699 M805,664 Q820,664 824,699 M782,703 Q774,712 772,738 M828,703 Q836,712 838,738" stroke="#ffffff" stroke-width="1.8" stroke-dasharray="5 7" style="animation:waterFlow .9s linear infinite"/>
+      </g>
+     </g>
+
+     <!-- generated structures (wudu khana, langar, prayer mats) are appended here by JS -->
+     <g id="midGen"></g>
+    </svg>
+   </div>
+
+   <!-- Layer 3: trees, flower beds -->
+   <div class="layer reveal" id="L-garden" style="transition-delay:1.3s"><svg id="svgGarden" viewBox="0 0 2400 900" preserveAspectRatio="none"></svg></div>
+
+   <!-- Layer 4: devotees, musicians, dervishes, children, cats, pigeons -->
+   <div class="layer reveal" id="L-actors" style="transition-delay:1.9s"><svg id="svgActors" viewBox="0 0 2400 900" preserveAspectRatio="none"></svg></div>
+
+   <!-- Layer 5: diya ledge (foreground) -->
+   <div class="layer reveal" id="L-fore" style="transition-delay:2.3s"><svg id="svgFore" viewBox="0 0 2400 900" preserveAspectRatio="none"></svg></div>
+
+   <!-- Lighting: warm golden wash + night dimming, then lamps on top so they stay bright -->
+   <div class="layer" id="L-warm"></div>
+   <div class="layer" id="L-dim"></div>
+   <div class="layer reveal" id="L-lights" style="transition-delay:2.6s"><svg id="svgLights" viewBox="0 0 2400 900" preserveAspectRatio="none"></svg></div>
+   <div class="layer" id="L-fx"><svg id="svgFx" viewBox="0 0 2400 900" preserveAspectRatio="none"></svg></div>
+
+   <!-- Layer 6: foreground crowd silhouettes (fastest parallax, wider than world) -->
+   <div class="layer par reveal" id="L-crowd" style="width:2700px;transition-delay:2.8s"><svg id="svgCrowd" viewBox="0 0 2700 900" preserveAspectRatio="none"></svg></div>
+  </div>
+ </div>
+</main>
+
+<!-- ===================== TITLE ===================== -->
+<header class="fixed top-0 inset-x-0 z-20 pointer-events-none text-center pt-2 sm:pt-4 ui-reveal" style="transition-delay:2.2s">
+  <h1 class="title-ur gold-text text-3xl sm:text-5xl leading-[2.1] sm:leading-[2]" dir="rtl" lang="ur">دربارِ سکون</h1>
+  <p class="title-en text-amber-50/95 text-xl sm:text-3xl -mt-3 sm:-mt-4 tracking-wide" style="text-shadow:0 2px 12px rgba(40,10,0,.6)">Darbar-e-Sukoon</p>
+  <p class="text-amber-100/80 text-[11px] sm:text-sm italic tracking-[0.25em] uppercase mt-1" style="text-shadow:0 1px 8px rgba(40,10,0,.7)">A Sufi shrine at dusk · rest for the heart</p>
+  <p id="hint" class="mt-3 text-amber-50/85 text-xs sm:text-sm transition-opacity duration-1000" style="text-shadow:0 1px 8px rgba(0,0,0,.7)">Drag or scroll to wander · tap the marble ledge to light a diya</p>
+</header>
+
+<!-- ===================== TOAST ===================== -->
+<div id="toast" role="status" aria-live="polite" class="fixed left-1/2 -translate-x-1/2 bottom-[96px] z-30 px-5 py-2 rounded-full bg-[#0b2a20]/80 backdrop-blur-md border border-amber-200/25 text-amber-50 text-sm sm:text-base italic opacity-0 pointer-events-none whitespace-nowrap"></div>
+
+<!-- ===================== CHADAR PICKER ===================== -->
+<div id="picker" class="hidden fixed inset-x-0 mx-auto w-max bottom-[92px] z-40 px-4 pt-3 pb-4 rounded-3xl bg-[#0b2a20]/85 backdrop-blur-md border border-amber-200/25 shadow-2xl" style="animation:fadeUp .5s ease both">
+  <p class="text-center text-amber-100/90 text-sm italic mb-3">Choose a chadar to offer</p>
+  <div class="flex gap-3" id="swatches"></div>
+</div>
+
+<!-- ===================== CONTROL BAR ===================== -->
+<nav aria-label="Darbar controls" class="fixed bottom-3 sm:bottom-5 inset-x-0 mx-auto w-max z-30 flex items-center gap-0.5 sm:gap-1 p-1.5 rounded-full bg-[#0b2a20]/70 backdrop-blur-md border border-amber-200/25 shadow-[0_10px_40px_rgba(0,0,0,.45)] ui-reveal">
+  <button class="ctrl" id="btnChadar" aria-haspopup="true" aria-expanded="false" title="Offer a chadar">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9c3-4 15-4 18 0v7c-3 2-15 2-18 0z"/><path d="M3 16c3 2 15 2 18 0M6 18.5v2M10 19.3v2M14 19.3v2M18 18.5v2"/><path d="M9 11.5l3-2 3 2-3 2z" fill="currentColor" stroke="none"/></svg>
+    <span class="hidden sm:block text-[11px] tracking-wider">Chadar</span>
+  </button>
+  <button class="ctrl" id="btnDiya" title="Light a diya">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14h18c-1 4-5 6-9 6s-8-2-9-6z"/><path d="M12 3c2.2 2.6 2.4 5 0 7.5C9.6 8 9.8 5.6 12 3z" fill="#f6c45a" stroke="#f6c45a"/></svg>
+    <span class="hidden sm:block text-[11px] tracking-wider">Diya</span>
+    <span class="badge" id="diyaCount">0</span>
+  </button>
+  <button class="ctrl" id="btnDonate" title="Drop a coin in the chanda box">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="9" width="16" height="11" rx="1.5"/><path d="M9 9h6"/><circle cx="12" cy="5" r="2.6" fill="#f6c45a" stroke="#f6c45a"/></svg>
+    <span class="hidden sm:block text-[11px] tracking-wider">Nazrana</span>
+    <span class="badge hidden" id="coinCount">0</span>
+  </button>
+  <span class="w-px h-8 bg-amber-100/20 mx-1" aria-hidden="true"></span>
+  <button class="ctrl" id="btnNight" aria-pressed="false" title="Night mode">
+    <svg id="icoMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/><path d="M17 4.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z" fill="currentColor"/></svg>
+    <svg id="icoSun" class="hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="13" r="4.2"/><path d="M12 4.5v1.8M4.5 13h1.8M17.7 13h1.8M6.6 7.6l1.3 1.3M17.4 7.6l-1.3 1.3M3 20h18"/></svg>
+    <span class="hidden sm:block text-[11px] tracking-wider" id="nightLabel">Night</span>
+  </button>
+  <button class="ctrl" id="btnSound" aria-pressed="false" title="Sound (off)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/><g id="icoMute"><path d="M16 10l4 4M20 10l-4 4"/></g><g id="icoWaves" class="hidden"><path d="M15.5 9.5a3.5 3.5 0 0 1 0 5M18 7a7 7 0 0 1 0 10"/></g></svg>
+    <span class="hidden sm:block text-[11px] tracking-wider" id="soundLabel">Sound</span>
+  </button>
+</nav>
+
+<script>
+'use strict';
+/* =====================================================================
+   0. UTILITIES
+   ===================================================================== */
+const $ = s => document.querySelector(s);
+const W = 2400, H = 900;
+const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const SLOW = RM ? 2.6 : 1;                         // animation-duration multiplier
+const rand = (a, b) => a + Math.random() * (b - a);
+const randi = (a, b) => Math.floor(rand(a, b + 1));
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const f2 = n => +(+n).toFixed(2);
+
+/** Inline looping animation whose transform-origin is in local SVG units. */
+function A(name, dur, delay = 0, ox = 0, oy = 0, ease = 'ease-in-out', extra = '') {
+  const d = typeof dur === 'number' ? f2(dur * SLOW) + 's' : dur;
+  return `style="animation:${name} ${d} ${ease} ${f2(delay)}s infinite;transform-origin:${f2(ox)}px ${f2(oy)}px;${extra}"`;
+}
+/** Parse SVG markup into a parent; returns the last inserted element. */
+function add(parent, markup) { parent.insertAdjacentHTML('beforeend', markup); return parent.lastElementChild; }
+/** Darken (f < 1) or lighten (f > 1) a #rrggbb colour. */
+function shade(hex, f) {
+  const n = parseInt(hex.slice(1), 16);
+  return '#' + [n >> 16, (n >> 8) & 255, n & 255]
+    .map(v => clamp(Math.round(v * f), 0, 255).toString(16).padStart(2, '0')).join('');
+}
+/** Perspective: lower on screen = closer = larger. */
+const depth = y => 0.7 + (y - 600) / 300 * 0.5;
+const limb = (d, c, w = 5) => `<path d="${d}" stroke="${c}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`;
+const hand = (x, y, c, r = 2.4) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${c}"/>`;
+
+/* =====================================================================
+   1. PALETTE
+   ===================================================================== */
+const PAL = {
+  skin:   ['#c98d62', '#b67a50', '#d6a273', '#a5693f', '#8f5a37', '#dca983'],
+  hair:   ['#1d1512', '#2a1d16', '#3a2a20'],
+  kurta:  ['#f7f0e2', '#ebe0c8', '#ffffff', '#d5e6da', '#ead5ad', '#dccbe6', '#c3d9e8', '#f0cfae', '#e8e3d6', '#b9d1c2'],
+  shawl:  ['#0e5a43', '#7a1f2b', '#b8323a', '#2f4f6f', '#6b3f2a', '#c77d17', '#5c2a52'],
+  dupatta:['#b8323a', '#e98a1e', '#0e7a5f', '#8e3a8a', '#d9577a', '#2aa79b', '#c9a227', '#f2e6cf'],
+  cap:    ['#ffffff', '#f4efe4', '#0e5a43', '#7a1f2b', '#e2b34a', '#222222'],
+  beard:  ['#2a1d16', '#3b2b20', '#d8d2c8', '#9a948a'],
+  cat:    ['#d9893a', '#8a8a92', '#2b2b2b', '#e9dcc4', '#b7651f'],
+  bright: ['#e85d75', '#f6b73c', '#2aa79b', '#7fb3ff', '#ff8a3d', '#b07cff', '#ffffff', '#5fd08a'],
+};
+
+/** Random but coherent look for one person; any field can be overridden. */
+function persona(o = {}) {
+  const female = o.female ?? Math.random() < .35;
+  return Object.assign({
+    female,
+    skin: pick(PAL.skin), hair: pick(PAL.hair), kurta: pick(PAL.kurta), dupatta: pick(PAL.dupatta),
+    cap: female ? null : (Math.random() < .72 ? pick(PAL.cap) : null),
+    beard: !female && Math.random() < .55 ? pick(PAL.beard) : null,
+    shawl: Math.random() < .3 ? pick(PAL.shawl) : null,
+  }, o, { female });
+}
+
+/* =====================================================================
+   2. CHARACTER FACTORIES  (each returns an SVG markup string;
+      local origin = the point where the figure touches the ground)
+   ===================================================================== */
+function headFront(cx, cy, p) {
+  let m = '';
+  if (p.female) m += `<path d="M${cx-10},${cy+13} Q${cx-12.5},${cy-12} ${cx},${cy-12.5} Q${cx+12.5},${cy-12} ${cx+10},${cy+13}Z" fill="${p.dupatta}"/>`;
+  m += `<circle cx="${cx}" cy="${cy}" r="7.2" fill="${p.skin}"/>`;
+  if (p.female) m += `<path d="M${cx-7.6},${cy-1} Q${cx},${cy-11} ${cx+7.6},${cy-1} Q${cx},${cy-6.5} ${cx-7.6},${cy-1}Z" fill="${p.dupatta}"/>`;
+  else {
+    m += `<path d="M${cx-7.4},${cy-1.5} Q${cx-7.4},${cy-9.6} ${cx},${cy-9.8} Q${cx+7.4},${cy-9.6} ${cx+7.4},${cy-1.5}Z" fill="${p.cap || p.hair}"/>`;
+    if (p.beard) m += `<path d="M${cx-6.6},${cy+.5} Q${cx-6},${cy+9.5} ${cx},${cy+10.5} Q${cx+6},${cy+9.5} ${cx+6.6},${cy+.5} Q${cx},${cy+5.5} ${cx-6.6},${cy+.5}Z" fill="${p.beard}"/>`;
+  }
+  // eyes gently closed in devotion
+  m += `<path d="M${cx-4.2},${cy-1} q1.3,.9 2.6,0 M${cx+1.6},${cy-1} q1.3,.9 2.6,0" stroke="#3a2418" stroke-width=".8" fill="none"/>`;
+  if (p.mouth) m += `<ellipse cx="${cx}" cy="${cy+4}" rx="1.5" ry="1" fill="#5a2620" ${A('lips', p.mouth, -rand(0, 1), cx, cy + 4)}/>`;
+  return m;
+}
+function headBack(cx, cy, p) {
+  if (p.female) return `<path d="M${cx-10.5},${cy+12} Q${cx-12},${cy-11} ${cx},${cy-11.5} Q${cx+12},${cy-11} ${cx+10.5},${cy+12} Q${cx},${cy+9} ${cx-10.5},${cy+12}Z" fill="${p.dupatta}"/>`;
+  return `<rect x="${cx-3}" y="${cy+4}" width="6" height="5" fill="${p.skin}"/><circle cx="${cx}" cy="${cy}" r="7.4" fill="${p.hair}"/>`
+    + (p.cap ? `<path d="M${cx-7.5},${cy-1.5} Q${cx-7.5},${cy-9.7} ${cx},${cy-9.9} Q${cx+7.5},${cy-9.7} ${cx+7.5},${cy-1.5}Z" fill="${p.cap}"/>` : '');
+}
+
+/** Seated, facing the viewer. o.arms: rest | clap | dua | eat | harmonium | lead | tabla */
+function seatedFront(x, y, o = {}) {
+  const p = persona(o), s = o.s ?? depth(y), k = p.kurta, sk = p.skin, beat = o.beat || 'var(--beat)';
+  const dl = o.delay ?? -rand(0, 3);
+  let arms = '', props = '', mouth = o.mouth || null;
+  switch (o.arms) {
+    case 'clap':
+      arms = `<g ${A('clapL', beat, dl, -11, -30, 'ease-in')}>${limb('M-11,-30 Q-14,-21 -3,-22', k)}${hand(-2.6, -22, sk)}</g>`
+           + `<g ${A('clapR', beat, dl, 11, -30, 'ease-in')}>${limb('M11,-30 Q14,-21 3,-22', k)}${hand(2.6, -22, sk)}</g>`;
+      mouth = mouth || `calc(${beat} * 2)`;
+      break;
+    case 'dua':
+      arms = limb('M-11,-30 Q-16,-19 -7,-25', k) + limb('M11,-30 Q16,-19 7,-25', k)
+           + `<ellipse cx="-6" cy="-27" rx="3.4" ry="2.1" fill="${sk}"/><ellipse cx="6" cy="-27" rx="3.4" ry="2.1" fill="${sk}"/>`;
+      mouth = mouth || .9;
+      break;
+    case 'eat':
+      props = `<ellipse cx="0" cy="-7" rx="9.5" ry="2.8" fill="#dfe3e8" stroke="#99a2ad" stroke-width=".6"/><ellipse cx="-1" cy="-8" rx="5" ry="1.6" fill="#d9a441"/><circle cx="4" cy="-8.5" r="1.8" fill="#f2ead8"/>`;
+      arms = limb('M-11,-30 Q-16,-18 -8,-10', k) + hand(-8, -10, sk)
+           + `<g ${A('eat', rand(3.5, 6), -rand(0, 6), 11, -30)}>${limb('M11,-30 Q15,-18 5,-12', k)}${hand(5, -12, sk)}</g>`;
+      break;
+    case 'harmonium': case 'lead':
+      props = `<path d="M-15,-17 L-22,-15 V-7 L-15,-6Z" fill="#8a5a2f" ${A('bellows', `calc(${beat} * 4)`, dl, -15, -11)}/>
+        <rect x="-15" y="-18" width="30" height="12" rx="1.5" fill="#6b3a1f"/><rect x="-15" y="-11" width="30" height="2" fill="#c9a24a"/>
+        <rect x="-13" y="-19.5" width="26" height="3" fill="#f6efe0"/><path d="M-12,-19.5 h24" stroke="#222" stroke-width="1.2" stroke-dasharray="1 1.5"/>`;
+      arms = `<g ${A('pump', `calc(${beat} * 4)`, dl, -11, -30)}>${limb('M-11,-30 Q-20,-25 -21,-15', k)}${hand(-21, -14, sk)}</g>`;
+      if (o.arms === 'lead') {
+        arms += `<g ${A('singArm', `calc(${beat} * 4)`, dl, 11, -30)}>${limb('M11,-30 Q21,-33 23,-45', k)}${hand(23, -46, sk, 2.7)}</g>`;
+        mouth = beat;
+      } else arms += `<g ${A('tap', `calc(${beat} * .5)`, dl)}>${limb('M11,-30 Q15,-22 6,-20', k)}${hand(6, -20, sk)}</g>`;
+      break;
+    case 'tabla':
+      props = `<ellipse cx="-9" cy="-11" rx="7.5" ry="6.5" fill="#8b9099"/><ellipse cx="-9" cy="-16.5" rx="6" ry="1.9" fill="#3b2f2a"/>
+        <rect x="3" y="-21" width="12" height="14" rx="2" fill="#7a4a24"/><ellipse cx="9" cy="-21" rx="6" ry="1.9" fill="#ece0c4"/><circle cx="9" cy="-21" r="1.7" fill="#222"/>`;
+      arms = `<g ${A('tap', beat, dl)}>${limb('M-11,-30 Q-17,-24 -9,-20', k)}${hand(-9, -20, sk)}</g>`
+           + `<g ${A('tap', `calc(${beat} * .5)`, dl)}>${limb('M11,-30 Q17,-25 9,-24', k)}${hand(9, -24, sk)}</g>`;
+      break;
+    default:
+      arms = limb('M-11,-30 Q-16,-18 -9,-9', k) + limb('M11,-30 Q16,-18 9,-9', k) + hand(-9, -9, sk) + hand(9, -9, sk);
+  }
+  const torso = `<path d="M-14,-5 Q-15.5,-24 -10.5,-32 Q0,-36.5 10.5,-32 Q15.5,-24 14,-5Z" fill="${k}"/>`
+    + (p.shawl && !p.female ? `<path d="M-12.5,-31 Q0,-24 12.5,-31 L14,-21 Q0,-15 -14,-21Z" fill="${p.shawl}" opacity=".92"/>` : '');
+  return `<g transform="translate(${f2(x)},${f2(y)}) scale(${f2(s)})">
+    <ellipse cx="0" cy="0" rx="21" ry="4.5" fill="#000" opacity=".16"/>
+    <ellipse cx="0" cy="-4" rx="18" ry="6" fill="${o.legs || shade(k, .84)}"/>
+    <g ${o.bodyAnim || ''}>${torso}<g ${o.headAnim || ''}>${headFront(0, -42, { ...p, mouth })}</g>${props}${arms}</g></g>`;
+}
+
+/** Seated, back to the viewer (facing the shrine / the musicians / the taps). o.arms: none | wash | dua */
+function seatedBack(x, y, o = {}) {
+  const p = persona(o), s = o.s ?? depth(y), k = p.kurta;
+  let arms = '';
+  if (o.arms === 'wash') arms = `<g ${A('scrub', rand(1.4, 2), -rand(0, 2), -10, -30)}>${limb('M-10,-30 Q-19,-34 -9,-44', k)}</g><g ${A('scrub', rand(1.4, 2), -rand(0, 2), 10, -30)}>${limb('M10,-30 Q19,-34 9,-44', k)}</g>`;
+  if (o.arms === 'dua') arms = limb('M-11,-30 Q-19,-33 -15,-44', k) + limb('M11,-30 Q19,-33 15,-44', k) + hand(-15, -45, p.skin, 2.6) + hand(15, -45, p.skin, 2.6);
+  return `<g transform="translate(${f2(x)},${f2(y)}) scale(${f2(s)})">
+    <ellipse cx="0" cy="0" rx="19" ry="4.2" fill="#000" opacity=".16"/>
+    <g ${o.bodyAnim || ''}><path d="M-15,0 Q-17,-21 -10.5,-31 Q0,-36 10.5,-31 Q17,-21 15,0Z" fill="${k}"/>
+    ${p.shawl && !p.female ? `<path d="M-14,-24 Q0,-36 14,-24 L15,-6 Q0,-2 -15,-6Z" fill="${p.shawl}" opacity=".9"/>` : ''}
+    ${arms}<g ${o.headAnim || ''}>${headBack(0, -41, p)}</g></g></g>`;
+}
+
+/** Standing, facing the viewer. o.arms: rest | dua | serve | stir | dhamaal; o.walk animates legs. */
+function standingFront(x, y, o = {}) {
+  const p = persona(o), s = o.s ?? depth(y), k = p.kurta, sk = p.skin, lg = o.legs || shade(k, .82);
+  const legs = o.walk
+    ? `<g class="limb" ${A('walk', .9, 0, -5, -30)}>${limb('M-5,-30 L-6,-1', lg, 7)}</g><g class="limb" ${A('walk', .9, -.45, 5, -30)}>${limb('M5,-30 L6,-1', shade(lg, .9), 7)}</g>`
+    : limb('M-5,-30 L-6,-1', lg, 7) + limb('M5,-30 L6,-1', lg, 7);
+  let arms = '', mouth = null, extraHead = '';
+  switch (o.arms) {
+    case 'dua':
+      arms = limb('M-10.5,-56 Q-17,-45 -8,-50', k) + limb('M10.5,-56 Q17,-45 8,-50', k)
+           + `<ellipse cx="-7" cy="-51.5" rx="3.4" ry="2.1" fill="${sk}"/><ellipse cx="7" cy="-51.5" rx="3.4" ry="2.1" fill="${sk}"/>`;
+      mouth = .9; break;
+    case 'serve':
+      arms = limb('M-10.5,-56 Q-15,-45 -14,-38', k) + `<path d="M-20,-38 h12 l-1.5,10 h-9Z" fill="#c3c8cf" stroke="#8d949c" stroke-width=".8"/><path d="M-19,-38 q5,-6 10,0" stroke="#8d949c" fill="none"/>`
+           + `<g ${A('serve', rand(2.2, 3.2), -rand(0, 2), 10.5, -56)}>${limb('M10.5,-56 Q16,-44 12,-38', k)}${hand(12, -38, sk)}${limb('M12,-38 L20,-30', '#9aa2ab', 1.6)}<ellipse cx="21" cy="-29.5" rx="3" ry="1.4" fill="#9aa2ab"/></g>`;
+      break;
+    case 'stir':
+      arms = `<g ${A('stir', 2.4, -rand(0, 2), 0, -50)}>${limb('M2,-64 L26,-14', '#6b4a2a', 2.6)}${limb('M-10.5,-56 Q-4,-46 6,-50', k)}${limb('M10.5,-56 Q14,-46 9,-44', k)}${hand(6, -50, sk)}${hand(9, -44, sk)}</g>`;
+      break;
+    case 'dhamaal':
+      arms = `<g ${A('armsUp', 1.3, -rand(0, 1), 0, -56)}>${limb('M-10.5,-56 Q-20,-64 -17,-80', k)}${limb('M10.5,-56 Q20,-64 17,-80', k)}${hand(-17, -81, sk)}${hand(17, -81, sk)}</g>`;
+      extraHead = `<path d="M-6,-72 Q-13,-62 -10,-50 M6,-72 Q13,-62 10,-50" stroke="${p.hair}" stroke-width="3.4" fill="none" stroke-linecap="round"/>`;
+      break;
+    default:
+      arms = limb('M-10.5,-56 Q-15,-45 -13,-35', k) + limb('M10.5,-56 Q15,-45 13,-35', k) + hand(-13, -34, sk) + hand(13, -34, sk);
+  }
+  const dham = o.arms === 'dhamaal';
+  const headAnim = dham ? A('headRoll', 1.3, -rand(0, 1), 0, -60) : (o.headAnim || '');
+  const bodyAnim = dham ? A('dhamaal', 2.6, -rand(0, 2), 0, 0) : (o.bodyAnim || '');
+  return `<g transform="translate(${f2(x)},${f2(y)}) scale(${f2(s)})"${o.cls ? ` class="${o.cls}"` : ''}>
+    <ellipse cx="0" cy="0" rx="14" ry="3.6" fill="#000" opacity=".18"/>
+    <g ${bodyAnim}>${legs}
+     <path d="M-12.5,-24 Q-14,-50 -10,-58 Q0,-62 10,-58 Q14,-50 12.5,-24 Q0,-21 -12.5,-24Z" fill="${k}"/>
+     ${p.shawl ? `<path d="M-10,-58 Q0,-52 10,-58 L12,-44 Q0,-38 -12,-44Z" fill="${p.shawl}" opacity=".9"/>` : ''}
+     ${arms}<g ${headAnim}>${extraHead}${headFront(0, -67, { ...p, mouth })}</g></g></g>`;
+}
+
+/** Standing, back to the viewer (dua before the shrine). */
+function standingBack(x, y, o = {}) {
+  const p = persona(o), s = o.s ?? depth(y), k = p.kurta, lg = shade(k, .82);
+  const arms = o.arms === 'dua'
+    ? limb('M-10.5,-56 Q-19,-52 -14,-64', k) + limb('M10.5,-56 Q19,-52 14,-64', k) + hand(-14, -65, p.skin, 2.6) + hand(14, -65, p.skin, 2.6) : '';
+  return `<g transform="translate(${f2(x)},${f2(y)}) scale(${f2(s)})">
+    <ellipse cx="0" cy="0" rx="14" ry="3.6" fill="#000" opacity=".18"/>
+    <g ${o.bodyAnim || ''}>${limb('M-5,-30 L-6,-1', lg, 7)}${limb('M5,-30 L6,-1', lg, 7)}
+     <path d="M-12.5,-24 Q-14,-50 -10,-58 Q0,-62 10,-58 Q14,-50 12.5,-24 Q0,-21 -12.5,-24Z" fill="${k}"/>
+     ${arms}<g ${o.headAnim || ''}>${headBack(0, -67, p)}</g></g></g>`;
+}
+
+/** A worshipper in profile (facing right) with four postures cross-faded by the parent's data-pose. */
+function namazi(x, y, o = {}) {
+  const p = persona({ female: false, ...o }), s = o.s ?? depth(y), k = p.kurta, sk = p.skin, lg = shade(k, .85);
+  const cap = p.cap || '#ffffff';
+  const hd = (cx, cy) => `<circle cx="${cx}" cy="${cy}" r="6" fill="${sk}"/><path d="M${cx-6},${cy-1} Q${cx-6},${cy-7.6} ${cx},${cy-7.8} Q${cx+6},${cy-7.6} ${cx+6},${cy-1}Z" fill="${cap}"/>`
+    + (p.beard ? `<path d="M${cx+.5},${cy+1.5} Q${cx+4},${cy+8} ${cx+6},${cy+2}Z" fill="${p.beard}"/>` : '');
+  const hdDown = (cx, cy) => `<circle cx="${cx}" cy="${cy}" r="6" fill="${sk}"/><path d="M${cx+1},${cy-6} Q${cx+7.6},${cy-6} ${cx+7.8},${cy} Q${cx+7.6},${cy+6} ${cx+1},${cy+6}Z" fill="${cap}"/>`;
+  return `<g transform="translate(${f2(x)},${f2(y)}) scale(${f2(s)})">
+    <path d="M-20,3 L34,3 L38,-4 L-16,-4Z" fill="${o.mat}"/><path d="M-17,1.5 L33,1.5 L36,-2.5 L-14,-2.5Z" fill="none" stroke="#e2b34a" stroke-width=".8"/>
+    <g class="pose p-qiyam">${limb('M0,-1 L0,-24', lg, 6)}${limb('M0,-16 L0,-46', k, 12)}${limb('M1,-43 Q6,-38 2,-35', k, 4)}${hd(1, -54)}</g>
+    <g class="pose p-ruku">${limb('M0,-1 L0,-26', lg, 6)}${limb('M0,-20 L0,-27 L23,-31', k, 12)}${limb('M19,-30 L4,-17', k, 4)}${hdDown(30, -32)}</g>
+    <g class="pose p-sujood">${limb('M-16,-2 L0,-2', lg, 6)}${limb('M0,-4 L-3,-16', k, 10)}${limb('M-3,-16 L16,-8', k, 11)}${limb('M15,-9 L19,-2', k, 4)}${hdDown(23, -6)}</g>
+    <g class="pose p-jalsa">${limb('M-14,-2 L6,-2', lg, 6)}${limb('M-4,-7 L6,-3', k, 9)}${limb('M-4,-8 L-2,-36', k, 12)}${limb('M-1,-32 Q5,-22 6,-10', k, 4)}${hd(-1, -44)}</g></g>`;
+}
+
+/** Whirling dervish (sema): flaring white tennure, pleats sweeping round, sikke hat. */
+let uid = 0;
+function dervish() {
+  const id = 'skirt' + (uid++), sk = pick(PAL.skin), spin = rand(.5, .65);
+  const skirt = 'M-7,-46 Q-14,-30 -25,-4 Q0,4 25,-4 Q14,-30 7,-46Z';
+  let pl = '';
+  for (let i = -40; i <= 56; i += 8) pl += `M${i},-50 L${i - 6},4 `;
+  return `<g class="dervish">
+    <ellipse cx="0" cy="0" rx="26" ry="5" fill="#000" opacity=".18"/>
+    <g ${A('whirl', spin * 2, -rand(0, 1))}>
+     <clipPath id="${id}"><path d="${skirt}"/></clipPath>
+     <g ${A('skirtFlare', spin * 2, 0, 0, -46)}>
+      <path d="${skirt}" fill="#fbf8f1"/>
+      <g clip-path="url(#${id})"><g ${A('pleats', spin, 0, 0, 0, 'linear')}><path d="${pl}" stroke="#d6cebd" stroke-width="2"/></g></g>
+      <path d="M-25,-4 Q0,4 25,-4" stroke="#cfc6b4" stroke-width="2" fill="none"/>
+     </g>
+     <path d="M-7,-46 L-8,-61 Q0,-65 8,-61 L7,-46Z" fill="#f6f2e8"/><path d="M-8,-47 h16" stroke="#cfc6b4" stroke-width="2"/>
+     ${limb('M7,-60 Q15,-68 19,-79', '#f6f2e8', 4)}${hand(19.5, -80, sk, 2.2)}
+     ${limb('M-7,-60 Q-15,-57 -20,-51', '#f6f2e8', 4)}${hand(-21, -50.5, sk, 2.2)}
+     <g transform="rotate(14 1 -66)"><circle cx="1" cy="-69" r="5.6" fill="${sk}"/><path d="M-3.6,-72 L-2,-92 Q2,-95 5.5,-92 L5.6,-72Z" fill="#a07c52"/></g>
+    </g></g>`;
+}
+
+/** Child running (profile, facing right; flipped by JS). */
+function child() {
+  const p = persona({ female: Math.random() < .5, kurta: pick(PAL.bright) });
+  const k = p.kurta, lg = shade(k, .72), d = .42;
+  return `<g class="child">
+    <ellipse cx="0" cy="0" rx="9" ry="2.4" fill="#000" opacity=".18"/>
+    <g class="limb" ${A('run', d, 0, 0, -15)}>${limb('M0,-15 L0,-1', shade(lg, .8), 4.5)}</g>
+    <g class="limb" ${A('run', d, -d / 2, 0, -15)}>${limb('M0,-15 L0,-1', lg, 4.5)}</g>
+    ${limb('M0,-30 L0,-13', k, 10)}
+    <g class="limb" ${A('run', d, -d / 2, 0, -27)}>${limb('M0,-27 L1,-17', shade(k, .88), 3.4)}</g>
+    <circle cx="1" cy="-36" r="5.6" fill="${p.skin}"/>
+    ${p.female ? `<path d="M-5,-36 Q-5,-43 1,-43 Q7,-42.5 6.5,-38 Q2,-40.5 -1.5,-38.5 L-5.5,-30Z" fill="${p.hair}"/>`
+               : `<path d="M-4.8,-37 Q-4,-42.5 1.5,-42 Q6.5,-41.5 6.4,-37.5 Q2,-39.5 -4.8,-37Z" fill="${p.hair}"/>`}
+  </g>`;
+}
+
+/** Cat with walk / sit / stretch / nap states (profile, facing right). */
+function cat() {
+  const c = pick(PAL.cat), d = shade(c, .78), eye = '#9bd36b';
+  const leg = (x, del) => `<g class="leg" ${A('walk', .7, del, x, -6)}>${limb(`M${x},-6 L${x},-.5`, d, 2.4)}</g>`;
+  const ears = (x, y) => `<path d="M${x-3},${y-3} L${x-2.4},${y-7.5} L${x},${y-4.2}Z M${x+1},${y-4.4} L${x+3.6},${y-7.4} L${x+4},${y-2.6}Z" fill="${c}"/>`;
+  return `<g class="cat" data-state="walk">
+    <ellipse cx="0" cy="0" rx="13" ry="2.6" fill="#000" opacity=".16"/>
+    <g class="cs c-walk"><g class="c-body">
+     ${leg(-7, 0)}${leg(-4, -.35)}${leg(6, -.35)}${leg(9, 0)}
+     <g ${A('tail', 2.2, -rand(0, 2), -11, -9)}>${limb('M-11,-9 Q-19,-12 -18,-22', c, 2.8)}</g>
+     <ellipse cx="0" cy="-9" rx="12" ry="5.2" fill="${c}"/>
+     <circle cx="12" cy="-13" r="4.6" fill="${c}"/>${ears(12, -13)}
+     <circle cx="14.2" cy="-13.5" r=".9" fill="${eye}"/>
+    </g></g>
+    <g class="cs c-sit">
+     ${limb('M-14,-1 Q-20,-1 -16,-5 Q-10,-6 -5,-2', c, 2.6)}
+     <path d="M-7,0 Q-9,-12 -1,-17 Q5,-17 6,-10 Q7,-3 5,0Z" fill="${c}"/>
+     <circle cx="2" cy="-20" r="4.6" fill="${c}"/>${ears(2, -20)}
+     <circle cx="4.2" cy="-20.5" r=".9" fill="${eye}"/>
+    </g>
+    <g class="cs c-nap"><g ${A('breathe', 3.4)}>
+     <ellipse cx="0" cy="-4.5" rx="11" ry="4.8" fill="${c}"/>
+     <circle cx="8" cy="-5" r="4.2" fill="${c}"/><path d="M6,-8.5 L6.8,-12 L9,-9Z" fill="${c}"/>
+     ${limb('M-10,-2 Q-6,2 6,.5', d, 2.6)}
+     <path d="M7,-5 q1.2,.8 2.4,0" stroke="#3a2418" stroke-width=".6" fill="none"/>
+    </g></g>
+  </g>`;
+}
+
+/** Pigeon: pecking on the ground, or flapping in flight. */
+function pigeon() {
+  const b = pick(['#8e93a3', '#9aa0ae', '#7d8292', '#b9bcc6', '#6f7383']), w = shade(b, 1.12);
+  return `<g class="pigeon hit">
+    <circle cx="0" cy="-6" r="12" fill="transparent"/>
+    <g class="pg-ground">
+     ${limb('M-1,-2 L-1,0 M1.5,-2 L1.5,0', '#d58a7a', 1)}
+     <path d="M-6,-5 L-12,-4 L-6,-2.6Z" fill="${shade(b, .8)}"/>
+     <ellipse cx="0" cy="-5" rx="6.8" ry="4" fill="${b}"/>
+     <ellipse cx="-1.4" cy="-5.6" rx="4.6" ry="2.6" fill="${w}"/>
+     <path d="M-3.5,-4.4 h3 M-3.2,-3.4 h3" stroke="#3d3f48" stroke-width=".7"/>
+     <g ${A('peck', rand(2.5, 5), -rand(0, 5), 3, -6)}>
+      <ellipse cx="4.2" cy="-8" rx="2.6" ry="3.2" fill="#5d847c"/>
+      <circle cx="5.6" cy="-10.6" r="2.5" fill="${shade(b, .92)}"/>
+      <path d="M7.8,-10.6 L9.8,-9.9" stroke="#e7c9b6" stroke-width="1.1" stroke-linecap="round"/>
+      <circle cx="6.3" cy="-11.2" r=".6" fill="#f08a24"/>
+     </g>
+    </g>
+    <g class="pg-fly">
+     <path d="M-6,-5 L-12,-4 L-6,-2.6Z" fill="${shade(b, .8)}"/>
+     <ellipse cx="0" cy="-5" rx="6.8" ry="3.6" fill="${b}"/>
+     <circle cx="6" cy="-7" r="2.5" fill="${shade(b, .92)}"/>
+     <g ${A('flap', .22, -rand(0, .2), 0, -6, 'linear')}><path d="M-3,-6 Q-6,-17 -15,-19 Q-6,-11 3,-6Z" fill="${w}"/><path d="M0,-6 Q4,-16 -2,-20 Q2,-11 4,-6Z" fill="${shade(w, .9)}"/></g>
+    </g>
+  </g>`;
+}
+
+/* =====================================================================
+   3. PROP FACTORIES  (trees, flowers, lamps)
+   ===================================================================== */
+function tree(x, y, s, kind = 'round') {
+  if (kind === 'cypress') {
+    return `<g transform="translate(${x},${y}) scale(${s})"><ellipse cx="0" cy="0" rx="20" ry="5" fill="#000" opacity=".15"/>
+      <g ${A('swaySoft', rand(6, 9), -rand(0, 6))}><rect x="-3" y="-22" width="6" height="22" fill="#5a3a22"/>
+      <path d="M0,-170 Q-24,-100 -19,-34 Q0,-16 19,-34 Q24,-100 0,-170Z" fill="#1d5235"/>
+      <path d="M0,-165 Q-12,-100 -9,-38" stroke="#2f7a4c" stroke-width="7" fill="none" opacity=".55"/></g></g>`;
+  }
+  const big = kind === 'banyan', R = big ? 1.6 : 1, n = big ? 16 : 9, cyc = big ? -126 : -120;
+  const greens = ['#1f5a35', '#2a6e3e', '#3b8248'];
+  let canopy = '';
+  greens.forEach((g, layer) => {
+    for (let i = 0; i < n; i++) {
+      const a = rand(0, Math.PI * 2), rr = Math.sqrt(Math.random());
+      canopy += `<circle cx="${f2(Math.cos(a) * rr * 60 * R)}" cy="${f2(cyc + Math.sin(a) * rr * 32 * R - layer * 7)}" r="${f2(rand(22, 34) * (big ? 1.25 : 1) - layer * 4)}" fill="${g}"/>`;
+    }
+  });
+  for (let i = 0; i < 7; i++) canopy += `<circle cx="${f2(rand(-55, 15) * R)}" cy="${f2(cyc - 22 + rand(-18, 18))}" r="${f2(rand(8, 15))}" fill="#6aad5c" opacity=".5"/>`;
+  const roots = big ? `<path d="${Array.from({ length: 10 }, () => { const rx = rand(-85, 85); return `M${f2(rx)},${f2(rand(-112, -92))} L${f2(rx + rand(-4, 4))},0`; }).join(' ')}" stroke="#6b4a30" stroke-width="2" opacity=".75"/>` : '';
+  return `<g transform="translate(${x},${y}) scale(${s})"><ellipse cx="0" cy="0" rx="${70 * R}" ry="10" fill="#000" opacity=".14"/>
+    <path d="M-10,0 Q-5,-40 -14,-86 L-5,-88 Q2,-56 0,-38 Q4,-66 14,-90 L20,-86 Q8,-52 10,0Z" fill="#5b3b25"/>${roots}
+    <g ${A('swaySoft', rand(7, 10), -rand(0, 6), 0, -80)}>${canopy}</g></g>`;
+}
+
+function flowerBed(x, y, w, colors) {
+  let m = `<ellipse cx="${x + w / 2}" cy="${y}" rx="${w / 2}" ry="9" fill="#2a5a30"/>`;
+  for (let i = 0; i < w / 9; i++) m += `<ellipse cx="${f2(x + rand(6, w - 6))}" cy="${f2(y - rand(0, 6))}" rx="${f2(rand(4, 7))}" ry="${f2(rand(2.5, 4))}" fill="${pick(['#2f6b34', '#3d7f3e', '#25562c'])}"/>`;
+  for (let gx = x + 8; gx < x + w - 6; gx += 16) {
+    let f = '';
+    for (let i = 0; i < 4; i++) {
+      const fx = f2(gx + rand(-6, 6)), fy = f2(y - rand(3, 15));
+      f += `<path d="M${fx},${y} L${fx},${fy}" stroke="#2f6b34" stroke-width="1.2"/><circle cx="${fx}" cy="${fy}" r="${f2(rand(2.4, 3.8))}" fill="${pick(colors)}"/><circle cx="${fx}" cy="${fy}" r="1" fill="#fff3c4" opacity=".8"/>`;
+    }
+    m += `<g ${A('sway', rand(4, 7), -rand(0, 5), gx, y)}>${f}</g>`;
+  }
+  return m;
+}
+
+function lantern(x, y, len, s = 1) {
+  const b = len + 5;
+  return `<g transform="translate(${x},${y}) scale(${s})"><g ${A('lanternSwing', rand(4.5, 6.5), -rand(0, 5))}>
+    <line x1="0" y1="0" x2="0" y2="${len}" stroke="#5a4a30" stroke-width="1.2"/>
+    <circle class="glow" cx="0" cy="${b + 8}" r="50" fill="url(#gGlow)"/>
+    <path d="M-5,${len} h10 l4,5 h-18Z" fill="#b8892f"/>
+    <path d="M-8,${b} h16 l-2.5,16 h-11Z" fill="#ffd27a" stroke="#8a5d1a" stroke-width="1.2"/>
+    <path d="M-2.5,${b} l-1,16 M2.5,${b} l1,16" stroke="#8a5d1a" stroke-width=".9"/>
+    <circle class="glow-strong" cx="0" cy="${b + 8}" r="4.5" fill="#fff4cf"/>
+    <path d="M-5.5,${b + 16} h11 l-3.5,4 h-4Z" fill="#b8892f"/></g></g>`;
+}
+
+function stringLights(d) {
+  return `<path d="${d}" stroke="#3a2a1a" stroke-width=".8" fill="none" opacity=".5"/>
+    <g class="glow-strong"><path d="${d}" stroke="#ffcf6e" stroke-width="9" stroke-dasharray="0 12" stroke-linecap="round" fill="none" opacity=".35"/>
+    <path d="${d}" stroke="#fff3c9" stroke-width="3.2" stroke-dasharray="0 12" stroke-linecap="round" fill="none" ${A('twinkle', 3, -rand(0, 3))}/></g>`;
+}
+
+function diyaBase(x, y) {
+  return `<g transform="translate(${f2(x)},${y})"><ellipse cx="0" cy="1" rx="10" ry="2.4" fill="#000" opacity=".25"/>
+    <path d="M-9,-4 Q-8,2 0,2.5 Q8,2 9,-4 Q0,-1.5 -9,-4Z" fill="#a5532a"/><path d="M-9,-4 Q0,-6.5 9,-4 Q0,-1.5 -9,-4Z" fill="#4a210f"/>
+    <path d="M6,-4.6 l5.5,-2.2 l-2.4,3.4z" fill="#a5532a"/><path d="M-6,-1 Q0,1 6,-1" stroke="#d98a4e" stroke-width=".8" fill="none"/></g>`;
+}
+function diyaFlame(x, y) {
+  return `<g transform="translate(${f2(x)},${y})"><g class="lit-in">
+    <circle class="glow-strong" cx="9" cy="-12" r="30" fill="url(#gGlow)"/>
+    <g ${A('flicker', rand(1.4, 2.2), -rand(0, 2), 9, -6)}><path d="M9,-5.5 Q4.6,-10 9,-20 Q13.4,-10 9,-5.5Z" fill="url(#gFlame)"/><path d="M9,-7 Q7.4,-9.6 9,-13.5 Q10.6,-9.6 9,-7Z" fill="#fffbe8"/></g></g></g>`;
+}
+
+/* =====================================================================
+   4. SCENE BUILDERS — shared defs, sky, distant city
+   ===================================================================== */
+const svgFar = $('#svgFar'), svgGarden = $('#svgGarden'), svgActors = $('#svgActors'), svgFore = $('#svgFore'),
+      svgLights = $('#svgLights'), svgFx = $('#svgFx'), svgCrowd = $('#svgCrowd');
+const vp = $('#viewport'), sizer = $('#sizer'), world = $('#world');
+let S = 1;                                           // current world → screen scale
+
+/** Gradients shared by every lamp, diya and glow (url() refs work across inline SVGs). */
+function buildDefs() {
+  add(svgLights, `<defs>
+    <radialGradient id="gGlow"><stop offset="0" stop-color="#ffd890" stop-opacity=".8"/><stop offset=".3" stop-color="#ffb850" stop-opacity=".34"/><stop offset="1" stop-color="#ff9a3c" stop-opacity="0"/></radialGradient>
+    <linearGradient id="gFlame" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#ff6a12"/><stop offset=".5" stop-color="#ffae2b"/><stop offset="1" stop-color="#fff2b0"/></linearGradient>
+  </defs>`);
+}
+
+/** Drifting clouds, a few birds heading home, and stars waiting for night. */
+function buildSky() {
+  const clouds = $('#clouds'), birds = $('#birds');
+  for (let i = 0; i < 7; i++) {
+    const w = rand(180, 420), el = document.createElement('div');
+    el.className = 'cloud';
+    el.style.cssText = `top:${f2(rand(4, 36))}%;width:${f2(w)}px;height:${f2(w * rand(.22, .32))}px;opacity:${f2(rand(.5, .9))};animation-duration:${f2(rand(140, 260) * SLOW)}s;animation-delay:-${f2(rand(0, 260))}s`;
+    clouds.appendChild(el);
+  }
+  for (let i = 0; i < 4; i++) {
+    const el = document.createElement('div');
+    el.className = 'bird';
+    el.innerHTML = '<i></i><i></i>';
+    el.style.cssText = `top:${f2(rand(10, 30))}%;animation-duration:${f2(rand(70, 110) * SLOW)}s;animation-delay:-${f2(rand(0, 100))}s`;
+    birds.appendChild(el);
+  }
+  let s = '';
+  for (let i = 0; i < 140; i++) {
+    const big = Math.random() < .15 ? 'width:3px;height:3px;' : '';
+    s += `<span class="star" style="left:${f2(rand(0, 100))}%;top:${f2(rand(0, 100))}%;${big}animation-duration:${f2(rand(3, 7))}s;animation-delay:-${f2(rand(0, 6))}s"></span>`;
+  }
+  $('#stars').innerHTML = s;
+}
+
+/** Hazy hills, a distant city of domes and minarets, and a tree line (drawn wide for parallax). */
+function buildFar() {
+  let m = `<defs><linearGradient id="gFar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8f5f7a"/><stop offset="1" stop-color="#6e4a68"/></linearGradient></defs>
+    <path d="M-700,470 Q-400,400 -100,440 T500,430 T1100,445 T1700,425 T2300,440 T3100,430 V520 H-700Z" fill="#a8708a" opacity=".5"/>`;
+  let x = -650, city = '', wins = '';
+  while (x < 3050) {
+    const w = rand(28, 70), h = rand(18, 66), top = 500 - h;
+    city += `M${f2(x)},500 V${f2(top)} H${f2(x + w)} V500Z `;
+    if (Math.random() < .18) {                       // a dome
+      const cx = x + w / 2, r = Math.min(w / 2, 20);
+      city += `M${f2(cx - r)},${f2(top)} Q${f2(cx - r)},${f2(top - r * 1.3)} ${f2(cx)},${f2(top - r * 1.7)} Q${f2(cx + r)},${f2(top - r * 1.3)} ${f2(cx + r)},${f2(top)}Z `;
+    }
+    if (Math.random() < .12) {                       // a minaret
+      const mx = x + rand(4, w - 4);
+      city += `M${f2(mx - 3)},${f2(top)} V${f2(top - 60)} H${f2(mx + 3)} V${f2(top)}Z M${f2(mx - 5)},${f2(top - 60)} Q${f2(mx)},${f2(top - 72)} ${f2(mx + 5)},${f2(top - 60)}Z `;
+    }
+    for (let i = 0; i < 3; i++) if (Math.random() < .5) wins += `<rect x="${f2(x + rand(4, w - 8))}" y="${f2(top + rand(6, Math.max(7, h - 8)))}" width="3" height="4"/>`;
+    x += w + rand(-6, 10);
+  }
+  let trees = 'M-700,505 ';
+  for (let tx = -700; tx < 3100; tx += rand(25, 55)) trees += `Q${f2(tx + 15)},${f2(rand(440, 478))} ${f2(tx + 30)},${f2(rand(488, 500))} `;
+  trees += 'L3100,505 V520 H-700Z';
+  m += `<path d="${city}" fill="url(#gFar)"/><g class="win-glow" fill="#ffd58a">${wins}</g><path d="${trees}" fill="#3c5a4a" opacity=".85"/>`;
+  add(svgFar, `<g>${m}</g>`);
+}
+
+/* =====================================================================
+   5. COURTYARD STRUCTURES & GARDEN
+   ===================================================================== */
+const GRAIN = { x0: 1180, x1: 1420, y0: 770, y1: 830 };   // where the pigeons peck
+const TREE_SPOTS = [];                                    // canopy centres, for falling leaves
+
+/** Wudu khana, qawwali shamiana, langar shed and scattered grain — drawn into #midGen. */
+function buildMid() {
+  let m = '';
+  // ---- wudu khana: tiled wall, brass taps, flowing water channel ----
+  const x0 = 1715, x1 = 1985, w = x1 - x0;
+  m += `<g id="wudu">
+    <rect x="${x0 - 6}" y="544" width="${w + 12}" height="8" fill="url(#pMerlon)"/>
+    <rect x="${x0 - 6}" y="551" width="${w + 12}" height="9" fill="#f4e8d2"/>
+    <rect x="${x0}" y="560" width="${w}" height="74" fill="url(#gIvory)"/>
+    <rect x="${x0}" y="560" width="${w}" height="6" fill="url(#pTilesDk)"/>
+    <rect x="${x0}" y="596" width="${w}" height="38" fill="url(#pTiles)"/>
+    <rect x="${x0}" y="594" width="${w}" height="2.5" fill="#c9a24a"/>
+    <text x="${x0 + w / 2}" y="586" font-family="Noto Nastaliq Urdu, serif" font-size="12" fill="#0e5a43" text-anchor="middle">وضو خانہ</text>
+    <rect x="${x0 - 4}" y="633" width="${w + 8}" height="17" fill="#ddd0b6"/>
+    <rect x="${x0 + 3}" y="636" width="${w - 6}" height="8" rx="3" fill="url(#gWater)"/>
+    <path d="M${x0 + 8},640 H${x1 - 8}" stroke="#e8fffb" stroke-width="1" stroke-dasharray="5 7" opacity=".8" ${A('waterFlow', 1.4, 0, 0, 0, 'linear')}/>
+    <rect x="${x0 - 4}" y="649" width="${w + 8}" height="5" fill="#c9b897"/>`;
+  for (let i = 0; i < 6; i++) {
+    const tx = x0 + 22 + i * 44;
+    m += `<circle cx="${tx}" cy="606" r="3.2" fill="#c9a24a"/>
+      <path d="M${tx},606 h7 v4" stroke="#b9c1c8" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+      <path d="M${tx + 7},611 V638" stroke="#bfeff0" stroke-width="2.4" opacity=".5"/>
+      <path d="M${tx + 7},611 V638" stroke="#fff" stroke-width="1.2" stroke-dasharray="5 7" ${A('waterFlow', .55, -rand(0, .5), 0, 0, 'linear')}/>
+      <ellipse cx="${tx + 7}" cy="639" rx="5" ry="1.4" fill="none" stroke="#fff" stroke-width=".8" ${A('ripple', 1.2, -rand(0, 1.2), tx + 7, 639, 'ease-out')}/>`;
+  }
+  m += `</g>`;
+
+  // ---- qawwali shamiana: striped canopy with a scalloped valance ----
+  let val = 'M330,598 ';
+  for (let i = 0; i < 18; i++) val += `q${f2(382 / 36)},11 ${f2(382 / 18)},0 `;
+  m += `<g id="shamiana">
+    <pattern id="pStripe" width="28" height="10" patternUnits="userSpaceOnUse"><rect width="14" height="10" fill="#a3202c"/><rect x="14" width="14" height="10" fill="#f0a82e"/></pattern>
+    <path d="M362,690 V588 M678,690 V588" stroke="#7a5a32" stroke-width="3"/>
+    <path d="M330,598 L356,566 H684 L712,598Z" fill="url(#pStripe)"/>
+    <path d="M356,566 H684" stroke="#e2b34a" stroke-width="2"/>
+    <path d="${val}Z" fill="#0e5a43" stroke="#e2b34a" stroke-width="1.2"/>
+    <path d="M338,752 V598 M704,752 V598" stroke="#8a6a3a" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="338" cy="596" r="4" fill="url(#gGold)"/><circle cx="704" cy="596" r="4" fill="url(#gGold)"/>
+  </g>`;
+
+  // ---- langar shed and the dastarkhwan cloths people eat on ----
+  m += `<g id="langarShed">
+    <path d="M2030,640 V556 M2390,640 V556 M2150,640 V560 M2270,640 V560" stroke="#6b4a2a" stroke-width="5"/>
+    <path d="M2018,560 L2040,530 H2390 L2400,560Z" fill="#8a3b22"/>
+    <path d="M2018,560 H2400" stroke="#5a2414" stroke-width="3"/><path d="M2040,530 H2390" stroke="#c9a24a" stroke-width="1.5"/>
+    <rect x="2160" y="534" width="80" height="22" rx="3" fill="#0e5a43"/>
+    <text x="2200" y="550" font-family="Noto Nastaliq Urdu, serif" font-size="10" fill="#f6d77a" text-anchor="middle">لنگر خانہ</text>
+    <rect x="2040" y="744" width="350" height="16" fill="#c8323a"/><rect x="2040" y="747" width="350" height="2" fill="#f4e8d2" opacity=".7"/>
+    <rect x="2050" y="844" width="340" height="16" fill="#c8323a"/><rect x="2050" y="847" width="340" height="2" fill="#f4e8d2" opacity=".7"/>
+  </g>`;
+
+  // ---- grain for the pigeons ----
+  let grain = '';
+  for (let i = 0; i < 90; i++) grain += `<ellipse cx="${f2(rand(GRAIN.x0 - 10, GRAIN.x1 + 10))}" cy="${f2(rand(GRAIN.y0 - 4, GRAIN.y1 + 4))}" rx="1.3" ry=".8" fill="${pick(['#e3c07a', '#c99a4f', '#f1d9a0'])}"/>`;
+  m += `<g id="grain">${grain}</g>`;
+  add($('#midGen'), `<g>${m}</g>`);
+}
+
+/** Trees, hedges and swaying flower beds. */
+function buildGarden() {
+  let m = '';
+  for (let x = 0; x < 925; x += 26) m += `<ellipse cx="${x}" cy="${f2(588 + rand(-2, 2))}" rx="${f2(rand(16, 22))}" ry="${f2(rand(9, 13))}" fill="${pick(['#2a6e3e', '#1f5a35', '#357a42'])}"/>`;
+  const T = [[95, 652, .95, 'banyan'], [270, 636, .92], [760, 640, .8], [948, 640, .72, 'cypress'], [1452, 640, .72, 'cypress'],
+             [1625, 622, .78], [2003, 645, .88], [2372, 618, .8]];
+  T.forEach(([x, y, s, k]) => {
+    m += tree(x, y, s, k);
+    TREE_SPOTS.push({ x, y: y - (k === 'cypress' ? 90 : k === 'banyan' ? 126 : 120) * s });
+  });
+  const blooms = ['#e85d75', '#c0392b', '#f39a1e', '#ffd04a', '#ffffff', '#d9577a'];
+  m += `<rect x="998" y="628" width="56" height="12" rx="2" fill="#e6d8be"/><rect x="1346" y="628" width="56" height="12" rx="2" fill="#e6d8be"/>`;
+  m += flowerBed(1002, 632, 48, blooms) + flowerBed(1350, 632, 48, blooms);
+  m += flowerBed(585, 774, 110, blooms) + flowerBed(20, 880, 170, blooms) + flowerBed(240, 820, 80, blooms);
+  add(svgGarden, `<g>${m}</g>`);
+}
+
+/* =====================================================================
+   6. ACTORS — devotees, musicians, worshippers, langar (static placement)
+   ===================================================================== */
+/** Join {y, m} entries back-to-front so nearer figures overlap farther ones. */
+const byDepth = list => list.sort((a, b) => a.y - b.y).map(e => e.m).join('');
+
+/** A deg (cooking pot) on a brick stove, with fire and rising steam. */
+function deg(x, y) {
+  let steam = '';
+  for (let i = 0; i < 4; i++) {
+    steam += `<ellipse cx="${f2(rand(-12, 12))}" cy="-56" rx="9" ry="7" fill="url(#gSteam)" style="animation:steam ${f2(rand(3.6, 5) * SLOW)}s ease-out ${f2(-i * 1.1)}s infinite;--dx:${f2(rand(-14, 22))}px;transform-box:fill-box;transform-origin:center"/>`;
+  }
+  return `<g transform="translate(${x},${y}) scale(${f2(depth(y))})">
+    <ellipse cx="0" cy="2" rx="44" ry="6" fill="#000" opacity=".2"/>
+    <rect x="-40" y="-20" width="80" height="22" fill="url(#pBrick)"/>
+    <path d="M-12,2 V-8 Q0,-17 12,-8 V2Z" fill="#2a0e05"/>
+    <path d="M-8,2 Q-6,-8 0,-12 Q6,-8 8,2Z" fill="#ff8a2a" ${A('fire', .8, -rand(0, .8), 0, 2)}/>
+    <path d="M-34,-18 Q-40,-46 -26,-56 H26 Q40,-46 34,-18 Q0,-12 -34,-18Z" fill="url(#gCopper)"/>
+    <ellipse cx="0" cy="-56" rx="27" ry="5.5" fill="#3a1a0a"/><ellipse cx="0" cy="-55" rx="23" ry="4" fill="#c9862e"/>
+    <path d="M-30,-30 Q0,-24 30,-30" stroke="#f0b070" stroke-width="1.2" fill="none" opacity=".5"/>
+    ${steam}</g>`;
+}
+
+function buildActors() {
+  // ---- at the grave: weeping, praying, reciting ----
+  const weep = () => A('weep', 2.8, -rand(0, 2));
+  const bow = () => A('nod', 5, -rand(0, 4), 0, -34);
+  const shrine = [
+    { y: 646, m: seatedBack(1162, 646, { female: true, bodyAnim: weep(), headAnim: bow() }) },
+    { y: 650, m: seatedBack(1236, 650, { female: false, arms: 'dua', bodyAnim: weep() }) },
+    { y: 668, m: seatedBack(1199, 668, { female: true, bodyAnim: weep(), headAnim: bow() }) },
+    { y: 676, m: seatedBack(1132, 676, { female: false, arms: 'dua' }) },
+    { y: 680, m: seatedBack(1262, 680, { female: false, bodyAnim: A('swaySoft', 3.2, -rand(0, 3), 0, 0) }) },
+    { y: 670, m: standingBack(1300, 670, { arms: 'dua' }) },
+    { y: 694, m: standingBack(1330, 694, { arms: 'dua', female: true }) },
+    { y: 688, m: seatedFront(1040, 688, { female: false, arms: 'dua', beard: '#d8d2c8', cap: '#ffffff' }) },
+    { y: 690, m: seatedFront(1372, 690, { female: true, arms: 'dua' }) },
+  ];
+
+  // ---- zikr circle: swaying and nodding together, in one rhythm ----
+  const zikr = [];
+  for (let i = 0; i < 7; i++) {
+    const a = i / 7 * Math.PI * 2 + .3, x = 970 + Math.cos(a) * 40, y = 770 + Math.sin(a) * 13;
+    const o = { female: false, bodyAnim: A('sway', 2.4, 0, 0, 0), headAnim: A('nod', 1.2, 0, 0, -34), mouth: 1.2 };
+    zikr.push({ y, m: Math.sin(a) < -.2 ? seatedFront(x, y, o) : seatedBack(x, y, o) });
+  }
+
+  // ---- namaz: three saffs facing the qibla (right), led by the imam ----
+  const mats = ['#0e5a43', '#7a1f2b', '#2f4f6f', '#6b3f2a', '#8d1f2b', '#1f6f5f'];
+  const namaz = [];
+  [1525, 1595, 1665].forEach((x, si) => [690, 730, 770, 810].forEach((y, k) => {
+    if (si === 0 && k === 3) return;
+    namaz.push({ y: y + x / 1e4, m: `<g class="namaz" data-pose="qiyam" data-lag="${f2(rand(.25, .8))}">${namazi(x + (k % 2) * 3, y, { mat: pick(mats) })}</g>` });
+  }));
+  namaz.push({ y: 745, m: `<g class="namaz" data-pose="qiyam" data-lag="0">${namazi(1735, 745, { mat: '#0e5a43', cap: '#ffffff', beard: '#d8d2c8', kurta: '#ffffff' })}</g>` });
+
+  // ---- wudu: washing at the taps ----
+  const wudu = [1786, 1874, 1962].map(x => ({ y: 668, m: seatedBack(x, 668, { female: false, arms: 'wash' }) }));
+  wudu.push({ y: 712, m: standingFront(1915, 712, { female: false }) });
+
+  // ---- langar: stirring the degs, eating in rows ----
+  const langar = [];
+  [2085, 2200, 2315].forEach(x => {
+    langar.push({ y: 640, m: standingFront(x - 18, 640, { female: false, arms: 'stir', kurta: pick(['#f7f0e2', '#ebe0c8', '#ffffff']) }) });
+    langar.push({ y: 668, m: deg(x, 668) });
+  });
+  for (let x = 2062; x < 2385; x += 46) langar.push({ y: 752, m: seatedFront(x + rand(-3, 3), 752, { arms: 'eat' }) });
+  for (let x = 2078; x < 2385; x += 48) langar.push({ y: 852, m: seatedFront(x + rand(-3, 3), 852, { arms: 'eat' }) });
+
+  add(svgActors, `<g>${byDepth(shrine)}${byDepth(zikr)}${byDepth(namaz)}${byDepth(wudu)}${byDepth(langar)}</g>`);
+
+  // ---- qawwali mehfil (hovering it lifts the tempo via --beat) ----
+  const nodBeat = () => A('nod', 'calc(var(--beat) * 2)', -rand(0, 1), 0, -34);
+  const q = [];
+  [455, 491, 527, 563, 599].forEach(x => q.push({ y: 706, m: seatedFront(x, 706, { arms: 'clap', female: false, headAnim: nodBeat() }) }));
+  q.push({ y: 739, m: seatedFront(468, 739, { arms: 'harmonium', female: false, headAnim: nodBeat() }) });
+  q.push({ y: 740, m: seatedFront(516, 740, { arms: 'lead', female: false, cap: '#ffffff', shawl: '#7a1f2b', headAnim: A('bob', 'calc(var(--beat) * 4)', 0, 0, -34) }) });
+  q.push({ y: 739, m: seatedFront(564, 739, { arms: 'harmonium', female: false, headAnim: nodBeat() }) });
+  q.push({ y: 738, m: seatedFront(610, 738, { arms: 'tabla', female: false, headAnim: nodBeat() }) });
+  [[392, 778], [440, 786], [488, 780], [604, 784], [652, 777]].forEach(([x, y]) => q.push({ y, m: seatedBack(x, y, {
+    bodyAnim: A('sway', 'calc(var(--beat) * 6)', -rand(0, 4), 0, 0), headAnim: A('nod', 'calc(var(--beat) * 4)', -rand(0, 3), 0, -34) }) }));
+  q.push({ y: 730, m: seatedFront(356, 730, { bodyAnim: A('sway', 'calc(var(--beat) * 6)', -rand(0, 4), 0, 0) }) });
+  q.push({ y: 732, m: seatedFront(688, 732, { bodyAnim: A('sway', 'calc(var(--beat) * 6)', -rand(0, 4), 0, 0) }) });
+  q.push({ y: 798, m: standingFront(372, 798, { arms: 'dhamaal', female: false }) });
+  q.push({ y: 800, m: standingFront(690, 800, { arms: 'dhamaal', female: false }) });
+  add(svgActors, `<g id="qawwali"><rect x="318" y="590" width="406" height="226" fill="transparent" style="pointer-events:auto"/>${byDepth(q)}</g>`);
+}
+
+/* =====================================================================
+   7. LIFE — dervishes, children, cats, pigeons, a langar server (rAF-driven)
+   ===================================================================== */
+const movers = [], pigeons = [], dervishes = [];
+let leafLayer = null, flockTimer = rand(30, 50), lastT = 0;
+const ZONES = {
+  kids: { x0: 340, x1: 950, y0: 824, y1: 888 },
+  cats: [{ x0: 250, x1: 930, y0: 858, y1: 890 }, { x0: 1390, x1: 1720, y0: 836, y1: 886 }, { x0: 2040, x1: 2380, y0: 870, y1: 893 }],
+};
+const inZone = z => [rand(z.x0, z.x1), rand(z.y0, z.y1)];
+const bez = (a, b, c, d, t) => { const u = 1 - t; return u * u * u * a + 3 * u * u * t * b + 3 * u * t * t * c + t * t * t * d; };
+function placeG(el, x, y, dir, s) { el.setAttribute('transform', `translate(${f2(x)},${f2(y)}) scale(${f2(dir * s)},${f2(s)})`); }
+
+/** Move a mover toward (tx,ty); returns true once it has arrived. */
+function stepToward(m, dt, speed) {
+  const dx = m.tx - m.x, dy = m.ty - m.y, d = Math.hypot(dx, dy);
+  if (d < 1.5) return true;
+  const st = Math.min(d, speed * dt);
+  m.x += dx / d * st; m.y += dy / d * st;
+  if (Math.abs(dx) > 1) m.dir = dx > 0 ? 1 : -1;
+  return false;
+}
+
+// ---- children: run about, sometimes chase one another, pause for breath ----
+function kidTarget(m) {
+  const others = movers.filter(o => o.kind === 'kid' && o !== m);
+  if (others.length && Math.random() < .35) { const o = pick(others); m.tx = o.x + rand(-20, 20); m.ty = o.y; }
+  else { const p = inZone(m.zone); m.tx = p[0]; m.ty = p[1]; }
+}
+function updateKid(m, dt) {
+  if (m.wait > 0) {
+    if ((m.wait -= dt) <= 0) { m.el.classList.remove('idle'); kidTarget(m); }
+    return;
+  }
+  if (stepToward(m, dt, m.speed)) {
+    if (Math.random() < .3) { m.wait = rand(.8, 3); m.el.classList.add('idle'); } else kidTarget(m);
+  }
+  placeG(m.el, m.x, m.y, m.dir, depth(m.y) * .95);
+}
+
+// ---- cats: wander, sit, nap, wake with a stretch ----
+function nextCat(m) {
+  const r = Math.random();
+  if (m.state === 'walk') m.state = r < .4 ? 'sit' : r < .65 ? 'nap' : r < .85 ? 'stretch' : 'walk';
+  else m.state = m.state === 'nap' ? 'stretch' : 'walk';
+  if (m.state === 'walk') { const p = inZone(m.zone); m.tx = p[0]; m.ty = p[1]; }
+  m.t = { sit: rand(5, 12), nap: rand(14, 30), stretch: 2.9, walk: 0 }[m.state];
+  m.el.dataset.state = m.state;
+}
+function updateCat(m, dt) {
+  if (m.state === 'walk') { if (stepToward(m, dt, 20)) nextCat(m); }
+  else if ((m.t -= dt) <= 0) nextCat(m);
+  placeG(m.el, m.x, m.y, m.dir, depth(m.y) * 1.05);
+}
+
+// ---- pigeons: peck and hop; scatter into a loop over the courtyard, then return ----
+function updatePigeon(m, dt) {
+  const f = m.fly;
+  if (f) {
+    if (f.delay > 0) { f.delay -= dt; return; }
+    if (!f.started) { f.started = true; m.el.classList.add('flying'); }
+    f.t = Math.min(1, f.t + dt / f.dur);
+    const u = f.t * f.t * (3 - 2 * f.t);
+    const x = bez(f.x[0], f.x[1], f.x[2], f.x[3], u), y = bez(f.y[0], f.y[1], f.y[2], f.y[3], u);
+    if (Math.abs(x - m.x) > .05) m.dir = x > m.x ? 1 : -1;
+    m.x = x; m.y = y;
+    placeG(m.el, x, y, m.dir, lerp(depth(f.y[0]), depth(f.y[3]), u) * 1.15);
+    if (f.t >= 1) { m.fly = null; m.el.classList.remove('flying'); m.tx = m.x; m.ty = m.y; m.hop = rand(1, 4); }
+    return;
+  }
+  if ((m.hop -= dt) <= 0) {
+    m.tx = clamp(m.x + rand(-28, 28), GRAIN.x0, GRAIN.x1);
+    m.ty = clamp(m.y + rand(-10, 10), GRAIN.y0, GRAIN.y1);
+    m.hop = rand(2, 7);
+  }
+  stepToward(m, dt, 26);
+  placeG(m.el, m.x, m.y, m.dir, depth(m.y) * 1.15);
+}
+function scatterPigeons() {
+  flockTimer = rand(40, 70);
+  if (pigeons.some(p => p.fly)) return;
+  Sound.flutter();
+  const side = Math.random() < .5 ? -1 : 1;
+  pigeons.forEach(m => {
+    const [hx, hy] = inZone(GRAIN), s = side * rand(.7, 1.3);
+    m.fly = { t: 0, delay: rand(0, .4), dur: rand(6, 8.5), started: false,
+      x: [m.x, m.x + s * rand(140, 300), hx + s * rand(200, 380), hx], y: [m.y, rand(150, 330), rand(120, 300), hy] };
+  });
+}
+
+// ---- a langar volunteer walks the rows, pausing to serve ----
+function updateServer(m, dt) {
+  if (m.wait > 0) {
+    if ((m.wait -= dt) <= 0) {
+      m.el.classList.remove('idle');
+      do { m.tx = rand(2070, 2370); } while (Math.abs(m.tx - m.x) < 50);
+    }
+    return;
+  }
+  if (stepToward(m, dt, 24)) { m.wait = rand(2.5, 5); m.el.classList.add('idle'); }
+  placeG(m.el, m.x, m.y, m.dir, depth(m.y));
+}
+
+// ---- dervishes slowly orbit the sema floor while they whirl ----
+function updateDervishes(dt) {
+  for (const d of dervishes) {
+    d.a += dt * .1;
+    d.y = 741 + Math.sin(d.a) * 21;
+    placeG(d.el, 180 + Math.cos(d.a) * 96, d.y, 1, depth(d.y) * 1.08);
+  }
+  // re-stack only when the depth order actually changes (moving a node restarts its animation)
+  const sorted = [...dervishes].sort((a, b) => a.y - b.y), parent = sorted[0] && sorted[0].el.parentNode;
+  if (!parent) return;
+  sorted.forEach((d, i) => { if (parent.children[i] !== d.el) parent.insertBefore(d.el, parent.children[i]); });
+}
+
+function buildLife() {
+  const spectators = [[96, 796], [150, 804], [232, 800], [282, 792]]
+    .map(([x, y]) => seatedBack(x, y, { headAnim: A('nod', 4, -rand(0, 4), 0, -34) })).join('');
+  add(svgActors, `<g id="sema">${standingFront(180, 712, { female: false, kurta: '#3b2f2a', cap: '#a07c52', beard: '#d8d2c8', shawl: null })}<g id="dervishes"></g>${spectators}</g>`);
+  const dv = $('#dervishes');
+  for (let i = 0; i < 4; i++) dervishes.push({ el: add(dv, dervish()), a: i * Math.PI / 2 + rand(-.25, .25), y: 0 });
+  updateDervishes(0);
+
+  const dyn = add(svgActors, '<g id="dyn"></g>');
+  for (let i = 0; i < 4; i++) {
+    const [x, y] = inZone(ZONES.kids);
+    movers.push({ kind: 'kid', el: add(dyn, child()), zone: ZONES.kids, x, y, tx: x, ty: y, dir: 1, wait: rand(0, 1.5), speed: rand(55, 78), update: updateKid });
+  }
+  ZONES.cats.forEach(zone => {
+    const [x, y] = inZone(zone);
+    const m = { kind: 'cat', el: add(dyn, cat()), zone, x, y, tx: x, ty: y, dir: 1, state: 'walk', t: 0, update: updateCat };
+    nextCat(m); movers.push(m);
+  });
+  for (let i = 0; i < 13; i++) {
+    const [x, y] = inZone(GRAIN);
+    const m = { kind: 'pigeon', el: add(dyn, pigeon()), x, y, tx: x, ty: y, dir: Math.random() < .5 ? 1 : -1, hop: rand(.5, 5), fly: null, update: updatePigeon };
+    pigeons.push(m); movers.push(m);
+  }
+  const server = add(dyn, `<g class="server">${standingFront(0, 0, { arms: 'serve', walk: true, s: 1, female: false, kurta: '#ffffff', cap: '#0e5a43' })}</g>`);
+  movers.push({ kind: 'server', el: server, x: 2090, y: 803, tx: 2350, ty: 803, dir: 1, wait: 0, update: updateServer });
+  leafLayer = add(svgActors, '<g id="leaves"></g>');
+}
+
+/** Leaves drifting down from the canopies. */
+function startLeaves() {
+  if (RM) return;
+  setInterval(() => {
+    if (document.hidden || !leafLayer || !TREE_SPOTS.length) return;
+    const t = pick(TREE_SPOTS), dur = rand(7, 11);
+    const g = add(leafLayer, `<g transform="translate(${f2(t.x + rand(-50, 50))},${f2(t.y + rand(-25, 25))})"><path class="leaf" d="M0,0 Q4,-4.5 9,0 Q4,4.5 0,0Z" fill="${pick(['#6aa04a', '#8db255', '#c9a13a', '#d98a3a', '#4f8a3c'])}" style="--dx:${f2(rand(-70, 90))}px;--dy:${f2(rand(140, 240))}px;--rot:${f2(rand(-600, 600))}deg;animation:leafFall ${f2(dur)}s ease-in-out forwards"/></g>`);
+    setTimeout(() => g.remove(), dur * 1000 + 200);
+  }, 1600);
+}
+
+/** Congregational prayer: everyone follows the imam through each posture, a beat behind. */
+const NAMAZ = [['qiyam', 9], ['ruku', 5], ['qiyam', 3], ['sujood', 5], ['jalsa', 3.5], ['sujood', 5],
+               ['qiyam', 8], ['ruku', 5], ['qiyam', 3], ['sujood', 5], ['jalsa', 3.5], ['sujood', 5], ['jalsa', 10]];
+function startNamaz() {
+  const people = [...document.querySelectorAll('.namaz')];
+  let i = 0;
+  const next = () => {
+    const [pose, dur] = NAMAZ[i++ % NAMAZ.length];
+    people.forEach(p => setTimeout(() => { p.dataset.pose = pose; }, (+p.dataset.lag || 0) * 1000 * SLOW));
+    setTimeout(next, dur * 1000 * SLOW);
+  };
+  setTimeout(next, 4000);
+}
+
+/** One loop drives every moving thing, the night fade and nothing else. */
+function frame(now) {
+  const dt = Math.min(.05, (now - lastT) / 1000) / SLOW;
+  lastT = now;
+  for (const m of movers) m.update(m, dt);
+  updateDervishes(dt);
+  if (!RM && (flockTimer -= dt) <= 0) scatterPigeons();
+  updateNight(dt);
+  requestAnimationFrame(frame);
+}
+
+/* =====================================================================
+   8. FOREGROUND LEDGE, LIGHTS & CROWD
+   ===================================================================== */
+const LEDGE = { x0: 1044, x1: 1352 };
+
+/** The marble diya ledge in front of the shrine — click anywhere on it to light a lamp. */
+function buildFore() {
+  const inlay = Array.from({ length: 11 }, (_, i) => `<path d="M${1050 + i * 30},716 l6,4 l-6,4 l-6,-4Z"/>`).join('');
+  add(svgFore, `<g id="ledge" class="hit" role="button" tabindex="0" aria-label="Diya ledge: light a clay lamp">
+    <ellipse cx="1200" cy="729" rx="178" ry="7" fill="#000" opacity=".18"/>
+    <path d="M1040,703 H1360 L1367,712 H1033Z" fill="#fbf3e2"/>
+    <rect x="1033" y="712" width="334" height="15" fill="url(#gMarble)"/>
+    <rect x="1033" y="712" width="334" height="1.6" fill="#fffaf0"/>
+    <path d="M1033,727 H1367" stroke="#b9a582" stroke-width="1"/>
+    <g fill="#c9b48f" opacity=".5">${inlay}</g>
+    <g id="diyaBases"></g>
+  </g>`);
+}
+
+/** Lamps, glows and string lights — above the night dimmer so they stay bright. */
+function buildLights() {
+  const jali = x => `M${x},552 V470 Q${x},446 ${x + 22},437 Q${x + 44},446 ${x + 44},470 V552Z`;
+  let m = `<ellipse class="glow" cx="1200" cy="560" rx="90" ry="55" fill="url(#gGlow)"/>
+    <g class="win-glow"><ellipse cx="1086" cy="500" rx="46" ry="70" fill="url(#gGlow)"/><ellipse cx="1314" cy="500" rx="46" ry="70" fill="url(#gGlow)"/>
+     <path d="${jali(1064)}" fill="#ffcf7a" opacity=".3"/><path d="${jali(1292)}" fill="#ffcf7a" opacity=".3"/></g>`;
+  [2085, 2200, 2315].forEach(x => { m += `<ellipse class="glow" cx="${x}" cy="660" rx="46" ry="22" fill="url(#gGlow)"/>`; });
+  m += ['M1032,345 H1368', 'M1200,86 Q1095,176 985,160', 'M1200,86 Q1305,176 1415,160', 'M985,296 Q860,410 700,486',
+        'M1415,296 Q1560,410 1716,546', 'M330,600 H712', 'M2018,561 H2400'].map(stringLights).join('');
+  m += lantern(1200, 410, 52, .95) + lantern(1086, 383, 8, .6) + lantern(1314, 383, 8, .6)
+     + lantern(420, 604, 14, .75) + lantern(520, 604, 22, .75) + lantern(620, 604, 14, .75)
+     + lantern(2100, 562, 16, .75) + lantern(2330, 562, 16, .75) + lantern(1790, 560, 10, .6) + lantern(1910, 560, 10, .6)
+     + lantern(140, 520, 40, .7) + lantern(52, 545, 26, .7);
+  add(svgLights, `<g>${m}<g id="diyaFlames"></g></g>`);
+}
+
+/** Dark, gently swaying silhouettes of visitors in the very front (fastest parallax). */
+function buildCrowd() {
+  let m = '';
+  [[20, 4], [760, 2], [1620, 2], [2200, 3], [2600, 4]].forEach(([x0, n]) => {
+    for (let i = 0; i < n; i++) {
+      const x = x0 + i * rand(55, 80), s = rand(1.15, 1.4), y = 925 + rand(0, 20), p = persona();
+      const top = p.female ? '<path d="M-17,-38 Q-17,-74 0,-74 Q17,-74 17,-38 Q8,-46 0,-46 Q-8,-46 -17,-38Z" fill="#2a1622"/>'
+                : p.cap ? '<path d="M-13,-61 Q-13,-73 0,-73 Q13,-73 13,-61Z" fill="#2a1a22"/>' : '';
+      m += `<g transform="translate(${f2(x)},${f2(y)}) scale(${f2(s)})"><g ${A('swaySoft', rand(6, 10), -rand(0, 8))}>
+        <path d="M-36,0 Q-34,-34 -13,-42 Q0,-46 13,-42 Q34,-34 36,0Z" fill="#1d1219"/><circle cx="0" cy="-58" r="13" fill="#1d1219"/>${top}
+        <path class="glow" d="M-34,-20 Q-30,-37 -13,-42 M13,-42 Q30,-37 34,-20 M-12,-66 Q0,-74 12,-66" stroke="#ffb46b" stroke-width="1.6" stroke-opacity=".35" fill="none"/>
+      </g></g>`;
+    }
+  });
+  add(svgCrowd, `<g opacity=".94">${m}</g>`);
+}
+
+/* =====================================================================
+   9. INTERACTIONS — chadar, diya, nazrana, pigeons, qawwali, night
+   ===================================================================== */
+const CHADARS = [
+  { name: 'Emerald', c: '#0f7a52', t: '#e9c25a' }, { name: 'Rose red', c: '#b8323a', t: '#f2d27a' },
+  { name: 'Maroon velvet', c: '#6e1424', t: '#e2b34a' }, { name: 'Saffron', c: '#e98a1e', t: '#7a1f2b' },
+  { name: 'Royal blue', c: '#24477a', t: '#e9c25a' }, { name: 'Ivory and gold', c: '#f4ead3', t: '#c9962a' },
+];
+const NAZRANA = ['Your nazrana will feed the langar tonight.', 'May your giving return to you as barakah.',
+                 'A coin for the pot, a prayer for the giver.', 'Shukriya. The degs will stay full.'];
+const diyas = [];
+let chadarN = 0, diyaN = 0, coinN = 0, toastTimer = 0, night = 0, nightTarget = 0, hintGone = false, closePicker = () => {};
+
+function toast(msg, ms = 3800) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.style.opacity = '1';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.style.opacity = '0'; }, ms);
+}
+function hideHint() { if (hintGone) return; hintGone = true; $('#hint').style.opacity = '0'; }
+/** Screen x → world x (the SVGs stretch the full 2400-unit world). */
+function worldX(clientX) { const r = svgFore.getBoundingClientRect(); return (clientX - r.left) / r.width * W; }
+/** Bring a world x into view if it is off-screen. */
+function scrollToWorld(x) {
+  const px = x * S, sl = vp.scrollLeft;
+  if (px < sl + 90 || px > sl + innerWidth - 90) vp.scrollTo({ left: px - innerWidth / 2, behavior: RM ? 'auto' : 'smooth' });
+}
+function sparkle(x, y, n = 9, color = '#ffe08a') {
+  let m = '';
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, Math.PI * 2), r = rand(10, 26);
+    m += `<path class="spark" d="M${x},${y - 3} L${x + .9},${y - .9} L${x + 3},${y} L${x + .9},${y + .9} L${x},${y + 3} L${x - .9},${y + .9} L${x - 3},${y} L${x - .9},${y - .9}Z" fill="${color}" style="--dx:${f2(Math.cos(a) * r)}px;--dy:${f2(Math.sin(a) * r - 8)}px"/>`;
+  }
+  const g = add(svgFx, `<g>${m}</g>`);
+  setTimeout(() => g.remove(), 1200);
+}
+
+// ---- Offer a chadar: it unfolds over the grave, then rose petals settle on it ----
+function offerChadar(ch) {
+  scrollToWorld(1200);
+  const n = chadarN++, w = 47 - (n % 3) * 2.5, top = 535 - Math.min(n, 10) * .5, bot = 581, L = f2(1200 - w), R = f2(1200 + w);
+  const holder = $('#chadars');
+  add(holder, `<g class="chadar-new">
+    <path d="M${L},${bot} L${L},571 Q${L + 2},${top + 4} 1200,${top} Q${R - 2},${top + 4} ${R},571 L${R},${bot} Q1200,${bot + 6} ${L},${bot}Z" fill="${ch.c}"/>
+    <path d="M${L},571 Q${L + 2},${top + 4} 1200,${top} Q${R - 2},${top + 4} ${R},571" stroke="#000" stroke-opacity=".12" fill="none"/>
+    <path d="M${L + 1},${bot - 3} Q1200,${bot + 3} ${R - 1},${bot - 3}" stroke="${ch.t}" stroke-width="2.2" fill="none"/>
+    <path d="M${L + 12},${top + 19} Q1200,${top + 10} ${R - 12},${top + 19}" stroke="${ch.t}" stroke-width="1.1" fill="none" stroke-dasharray="2 2.4"/>
+    <path d="M1200,${top + 9} l7,5 l-7,5 l-7,-5Z" fill="${ch.t}" opacity=".85"/>
+    <path d="M${L + 3},${bot + 1.5} Q1200,${bot + 7.5} ${R - 3},${bot + 1.5}" stroke="${ch.t}" stroke-width="2.6" fill="none" stroke-dasharray="1 2" stroke-linecap="round"/>
+  </g>`);
+  if (holder.children.length > 10) holder.firstElementChild.remove();
+  setTimeout(() => dropPetals(14, top, w), 1300);
+  Sound.chime();
+  toast(`Your ${ch.name.toLowerCase()} chadar rests upon the mazar. May your prayers be accepted.`, 4600);
+}
+function dropPetals(n, top, w) {
+  const g = $('#petals');
+  for (let i = 0; i < n; i++) {
+    const x = rand(1200 - w + 10, 1200 + w - 10), surf = top + (571 - top) * ((x - 1200) / w) ** 2;
+    add(g, `<ellipse class="petal" cx="${f2(x)}" cy="${f2(rand(surf + 3, 576))}" rx="2.4" ry="1.5" fill="${pick(['#c0182b', '#e8364a', '#9e1020', '#f39a1e', '#ffd04a'])}" style="--px:${f2(rand(-25, 25))}px;--pr:${f2(rand(-260, 260))}deg;animation-delay:${f2(i * .07)}s"/>`);
+  }
+  while (g.children.length > 140) g.firstElementChild.remove();
+}
+
+// ---- Light a diya: a clay lamp on the ledge with a flickering flame ----
+function placeDiya(x, mine = true) {
+  if (x == null) {                                  // no spot given: choose the emptiest stretch of ledge
+    let best = 1200, bestD = -1;
+    for (let i = 0; i < 24; i++) {
+      const c = rand(LEDGE.x0 + 8, LEDGE.x1 - 14), d = diyas.reduce((min, o) => Math.min(min, Math.abs(o.x - c)), 1e9);
+      if (d > bestD) { bestD = d; best = c; }
+    }
+    x = best;
+  }
+  x = clamp(x, LEDGE.x0 + 8, LEDGE.x1 - 14);
+  const y = diyas.filter(o => Math.abs(o.x - x) < 14).length % 2 ? 711.5 : 708;
+  const base = add($('#diyaBases'), `<g class="lit-in">${diyaBase(x, y)}</g>`);
+  const flame = add($('#diyaFlames'), diyaFlame(x, y));
+  diyas.push({ x, base, flame });
+  if (diyas.length > 48) { const o = diyas.shift(); o.base.remove(); o.flame.remove(); }
+  if (!mine) return;
+  diyaN++;
+  $('#diyaCount').textContent = diyaN;
+  Sound.strike();
+  sparkle(f2(x + 9), y - 14, 5, '#ffd27a');
+  if (diyaN === 1) toast('A diya is lit. May its light reach every heart that prays here.');
+  else if (diyaN % 10 === 0) toast(`${diyaN} diyas burn on the ledge tonight.`);
+}
+
+// ---- Nazrana: a coin drops into the chanda box with a sparkle ----
+function donate() {
+  scrollToWorld(1102);
+  const g = add(svgFx, `<g class="coin-drop"><g class="coin-spin"><circle cx="1102" cy="597" r="5.5" fill="url(#gGold)" stroke="#a87618" stroke-width=".8"/><path d="M1100,595.5 h4 M1100,598.5 h4" stroke="#a87618" stroke-width=".6"/></g></g>`);
+  setTimeout(() => {
+    sparkle(1102, 594);
+    Sound.clink();
+    const box = $('#chanda');
+    box.classList.remove('jiggle'); void box.getBoundingClientRect(); box.classList.add('jiggle');
+    coinN++;
+    const b = $('#coinCount'); b.textContent = coinN; b.classList.remove('hidden');
+    toast(pick(NAZRANA));
+  }, 1000);
+  setTimeout(() => g.remove(), 1300);
+}
+
+// ---- Night mode: fade --night over a few seconds ----
+function setNight(on) {
+  nightTarget = on ? 1 : 0;
+  const b = $('#btnNight');
+  b.setAttribute('aria-pressed', String(on));
+  b.title = on ? 'Return to dusk' : 'Night mode';
+  $('#icoMoon').classList.toggle('hidden', on);
+  $('#icoSun').classList.toggle('hidden', !on);
+  $('#nightLabel').textContent = on ? 'Dusk' : 'Night';
+  toast(on ? 'Night settles over the darbar. The lamps burn brighter.' : 'The golden hour returns.');
+}
+function updateNight(dt) {
+  if (night === nightTarget) return;
+  night = nightTarget > night ? Math.min(1, night + dt / 5) : Math.max(0, night - dt / 5);
+  document.documentElement.style.setProperty('--night', night.toFixed(3));
+}
+
+function toggleSound() {
+  const on = Sound.toggle(), b = $('#btnSound');
+  b.setAttribute('aria-pressed', String(on));
+  b.title = on ? 'Sound (on)' : 'Sound (off)';
+  $('#icoMute').classList.toggle('hidden', on);
+  $('#icoWaves').classList.toggle('hidden', !on);
+}
+
+/** Wire the control bar and every clickable thing in the scene. */
+function buildUI() {
+  const sw = $('#swatches'), picker = $('#picker'), btnChadar = $('#btnChadar');
+  CHADARS.forEach(ch => {
+    const b = document.createElement('button');
+    b.className = 'swatch';
+    b.style.background = `linear-gradient(160deg, ${ch.c} 58%, ${ch.t})`;
+    b.title = ch.name;
+    b.setAttribute('aria-label', `Offer a ${ch.name.toLowerCase()} chadar`);
+    b.addEventListener('click', () => { closePicker(); offerChadar(ch); });
+    sw.appendChild(b);
+  });
+  closePicker = () => { picker.classList.add('hidden'); btnChadar.setAttribute('aria-expanded', 'false'); };
+  btnChadar.addEventListener('click', e => {
+    e.stopPropagation();
+    if (picker.classList.contains('hidden')) { picker.classList.remove('hidden'); btnChadar.setAttribute('aria-expanded', 'true'); sw.firstElementChild.focus(); }
+    else closePicker();
+  });
+  document.addEventListener('click', e => { if (!picker.contains(e.target)) closePicker(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closePicker(); });
+
+  $('#btnDiya').addEventListener('click', () => {
+    scrollToWorld(1200);
+    placeDiya();
+    const ledge = $('#ledge');
+    ledge.classList.remove('ledge-hint'); void ledge.getBoundingClientRect(); ledge.classList.add('ledge-hint');
+  });
+  $('#btnDonate').addEventListener('click', donate);
+  $('#btnNight').addEventListener('click', () => setNight(nightTarget === 0));
+  $('#btnSound').addEventListener('click', toggleSound);
+
+  const keyActivate = fn => e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(); } };
+  const ledge = $('#ledge');
+  ledge.addEventListener('click', e => { if (!dragged) placeDiya(worldX(e.clientX)); });
+  ledge.addEventListener('keydown', keyActivate(() => placeDiya()));
+  const chanda = $('#chanda');
+  chanda.addEventListener('click', () => { if (!dragged) donate(); });
+  chanda.addEventListener('keydown', keyActivate(donate));
+  chanda.addEventListener('animationend', () => chanda.classList.remove('jiggle'));
+  svgActors.addEventListener('click', e => { if (!dragged && e.target.closest('.pigeon')) scatterPigeons(); });
+
+  // hovering the mehfil lifts the tempo; on touch, a tap lifts it for a while
+  const qw = $('#qawwali');
+  let qwTimer = 0;
+  qw.addEventListener('pointerenter', e => { if (e.pointerType === 'mouse') qw.classList.add('intense'); });
+  qw.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') qw.classList.remove('intense'); });
+  qw.addEventListener('click', e => {
+    if (e.pointerType === 'mouse' || dragged) return;
+    qw.classList.add('intense'); clearTimeout(qwTimer);
+    qwTimer = setTimeout(() => qw.classList.remove('intense'), 8000);
+  });
+
+  // a few diyas already burn, lit by earlier visitors
+  for (let i = 0; i < 5; i++) placeDiya(LEDGE.x0 + 22 + i * 66 + rand(-8, 8), false);
+}
+
+/* =====================================================================
+   10. SOUND — synthesised with the Web Audio API; silent until asked
+   ===================================================================== */
+const Sound = (() => {
+  let ctx = null, master, room, amb, qBus, fBus, murmur, noise, on = false, timer = 0, nextT = 0, step = 0, birdAt = 0, murAt = 0, cx = 1200;
+  const THEKA = ['dha', 'ge', 'na', 'ti', 'na', 'ka', 'dhi', 'na'];                      // keherwa, 8 matras
+  const SA = 293.66, RATIO = { S: 1, r: 16 / 15, g: 6 / 5, m: 4 / 3, P: 3 / 2, d: 8 / 5, N: 9 / 10 };  // Bhairavi colours
+  const TUNE = 'S-rgm-grgmP-mgrSP-dPmPgmrgS-NS--';                                        // '-' holds the note
+  const intense = () => !!document.querySelector('#qawwali.intense');
+  const beatLen = () => (intense() ? .44 : .74);
+
+  const gain = v => { const g = ctx.createGain(); g.gain.value = v; return g; };
+  const filt = (type, f, q = .7) => { const b = ctx.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = q; return b; };
+  const chain = (...n) => n.reduce((a, b) => (a.connect(b), b));
+  function loopNoise() { const s = ctx.createBufferSource(); s.buffer = noise; s.loop = true; s.start(0, rand(0, 2)); return s; }
+  function lfo(rate, amt, param) { const o = ctx.createOscillator(), g = gain(amt); o.frequency.value = rate; o.connect(g); g.connect(param); o.start(); }
+  function env(g, t, peak, a, d) { g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(.0001, t + a + d); }
+  function osc(type, f, t, dur, peak, dest, a = .004) {
+    const o = ctx.createOscillator(), g = gain(0);
+    o.type = type; o.frequency.setValueAtTime(f, t); env(g, t, peak, a, dur);
+    o.connect(g); g.connect(dest); o.start(t); o.stop(t + a + dur + .05);
+    return o;
+  }
+  function burst(t, f, q, peak, dur, dest) {
+    const s = ctx.createBufferSource(), g = gain(0);
+    s.buffer = noise; chain(s, filt('bandpass', f, q), g, dest); env(g, t, peak, .002, dur);
+    s.start(t, rand(0, 2)); s.stop(t + dur + .05);
+  }
+
+  function init() {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return false;
+    ctx = new AC();
+    noise = ctx.createBuffer(1, ctx.sampleRate * 3, ctx.sampleRate);
+    const d = noise.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    master = gain(0); master.connect(ctx.destination);
+    // a soft feedback echo stands in for the courtyard's stone walls
+    room = gain(1);
+    const dl = ctx.createDelay(1), fb = gain(.3), damp = filt('lowpass', 1800), wet = gain(.25);
+    dl.delayTime.value = .21; chain(room, dl, damp, fb, dl); damp.connect(wet); wet.connect(master);
+    amb = gain(1); amb.connect(master);
+    qBus = gain(0); qBus.connect(master); qBus.connect(room);
+    fBus = gain(0); fBus.connect(master);
+    const wind = gain(.05); chain(loopNoise(), filt('lowpass', 380), wind, amb); lfo(.05, .035, wind.gain);
+    const fountain = gain(.2); chain(loopNoise(), filt('bandpass', 2100, .5), filt('highpass', 700), fountain, fBus); lfo(.37, .06, fountain.gain);
+    murmur = gain(0); chain(loopNoise(), filt('bandpass', 420, 1.6), filt('lowpass', 1000), murmur, amb);
+    // harmonium drone on Sa–Pa–Sa, its reeds breathing with the bellows
+    const reeds = filt('lowpass', 1000, 1), drone = gain(.022);
+    chain(reeds, drone, qBus); lfo(.3, 260, reeds.frequency); lfo(.3, .006, drone.gain);
+    [SA / 2, SA * .75, SA].forEach(f => { const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = rand(-7, 7); o.connect(reeds); o.start(); });
+    return true;
+  }
+
+  function note(f, t, dur) {
+    const lp = filt('lowpass', 1500, .9), g = gain(0);
+    chain(lp, g, qBus);
+    [['sawtooth', 0], ['square', 6]].forEach(([type, det]) => {
+      const o = ctx.createOscillator(); o.type = type; o.frequency.value = f; o.detune.value = det;
+      o.connect(lp); o.start(t); o.stop(t + dur + .3);
+    });
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.03, t + .07);
+    g.gain.setValueAtTime(.03, t + dur - .05); g.gain.linearRampToValueAtTime(0, t + dur + .25);
+  }
+  function bayan(t, v) {
+    const o = ctx.createOscillator(), g = gain(0);
+    o.frequency.setValueAtTime(130, t); o.frequency.exponentialRampToValueAtTime(64, t + .3);
+    env(g, t, .3 * v, .005, .45); o.connect(g); g.connect(qBus); o.start(t); o.stop(t + .55);
+  }
+  function dayan(t, f, v, d = .26) { osc('triangle', f, t, d, .13 * v, qBus); osc('sine', f * 2.01, t, d * .6, .05 * v, qBus); }
+  function stroke(bol, t) {
+    if (bol === 'dha') { bayan(t, 1); dayan(t, 520, 1); }
+    else if (bol === 'ge') bayan(t, .8);
+    else if (bol === 'dhi') { bayan(t, .9); dayan(t, 520, .6, .18); }
+    else if (bol === 'na') dayan(t, 520, .9);
+    else if (bol === 'ti') { dayan(t, 760, .45, .09); burst(t, 3400, 2, .06, .03, qBus); }
+    else if (bol === 'ka') burst(t, 900, 1.5, .12, .06, qBus);
+  }
+  function clap(t) { for (let i = 0; i < 3; i++) burst(t + i * .011, 1200 + i * 220, 1.2, .14, .07, qBus); }
+  function beat(i, t) {
+    const b = beatLen(), k = i % 8, hot = intense();
+    stroke(THEKA[k], t);
+    if (hot && k % 2) stroke('na', t + b / 2);
+    if (k % 2 === 0 || hot) clap(t);
+    const j = i % TUNE.length, ch = TUNE[j];
+    if (ch !== '-') {
+      let len = 1;
+      while (TUNE[(j + len) % TUNE.length] === '-' && len < 4) len++;
+      note(SA * RATIO[ch], t, len * b * .95);
+    }
+  }
+  function birds(t) {
+    if (Math.random() < .25) {                       // the koel's rising evening call
+      const base = rand(560, 660);
+      for (let i = 0; i < 3; i++) {
+        const f = base * (1 + i * .07), o = osc('sine', f, t + i * .62, .38, .018, amb, .05);
+        o.frequency.exponentialRampToValueAtTime(f * 1.45, t + i * .62 + .3);
+      }
+    } else {                                         // sparrow chirps
+      const n = randi(2, 5), f = rand(2600, 3500);
+      for (let i = 0; i < n; i++) {
+        const tt = t + i * rand(.08, .16), o = osc('sine', f, tt, .07, .012, amb, .01);
+        o.frequency.linearRampToValueAtTime(f * rand(1.1, 1.4), tt + .06);
+      }
+    }
+  }
+  function tick() {
+    const now = ctx.currentTime;
+    if (nextT < now) nextT = now + .05;              // the tab slept: skip ahead, never burst
+    while (nextT < now + .15) { beat(step++, nextT); nextT += beatLen(); }
+    if (now > birdAt) { birds(now + .05); birdAt = now + rand(2.5, 7); }
+    if (now > murAt) { murmur.gain.setTargetAtTime(rand(.004, .02), now, .6); murAt = now + rand(.6, 1.6); }
+  }
+  /** The qawwali and fountain grow louder as the view pans toward them. */
+  function pos(x) {
+    cx = x;
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    qBus.gain.setTargetAtTime(clamp(1 - Math.abs(x - 520) / 1500, .12, 1), t, .4);
+    fBus.gain.setTargetAtTime(clamp(1 - Math.abs(x - 805) / 900, .08, 1) * .5, t, .4);
+  }
+  function toggle() {
+    if (!ctx && !init()) return false;
+    on = !on;
+    const t = ctx.currentTime;
+    master.gain.cancelScheduledValues(t);
+    master.gain.setValueAtTime(master.gain.value, t);
+    clearInterval(timer);
+    if (on) {
+      ctx.resume();
+      master.gain.setTargetAtTime(.85, t, .8);
+      nextT = t + .1;
+      timer = setInterval(tick, 30);
+      pos(cx);
+    } else {
+      master.gain.setTargetAtTime(0, t, .25);
+      setTimeout(() => { if (!on) ctx.suspend(); }, 1200);
+    }
+    return on;
+  }
+  const sfx = fn => () => { if (on && ctx) fn(ctx.currentTime + .01); };
+  return {
+    toggle, pos,
+    clink: sfx(t => { osc('sine', 2350, t, .35, .05, master); osc('sine', 3620, t, .22, .03, master); osc('sine', 2480, t + .11, .25, .025, master); }),
+    flutter: sfx(t => { for (let i = 0; i < 14; i++) burst(t + i * .045 + rand(0, .02), rand(700, 1300), .9, .05, .05, amb); }),
+    strike: sfx(t => { burst(t, 3000, 1, .05, .08, master); osc('sine', 180, t + .02, .5, .03, master, .08); }),
+    chime: sfx(t => [880, 1320, 1760, 2217].forEach((f, i) => osc('sine', f, t + i * .12, 2.2, .025, master))),
+  };
+})();
+
+/* =====================================================================
+   11. VIEWPORT — fit to height, drag / wheel / swipe to pan, parallax
+   ===================================================================== */
+const Lfar = $('#L-far'), Lcrowd = $('#L-crowd'), skyPar = $('#skyPar');
+let drag = null, dragged = false;
+
+function layout(centerX) {
+  const cxw = centerX ?? (vp.scrollLeft + innerWidth / 2) / S;
+  S = Math.max(innerHeight / H, innerWidth / W);
+  world.style.transform = `scale(${S})`;
+  sizer.style.width = `${Math.ceil(W * S)}px`;
+  vp.scrollLeft = cxw * S - innerWidth / 2;
+  updateParallax();
+}
+function updateParallax() {
+  const sl = vp.scrollLeft, wx = sl / S;
+  Lfar.style.transform = `translate3d(${f2(wx * .35)}px,0,0)`;
+  Lcrowd.style.transform = `translate3d(${f2(-wx * .12)}px,0,0)`;
+  skyPar.style.transform = `translate3d(${f2(-sl * .04)}px,0,0)`;
+  Sound.pos(wx + innerWidth / 2 / S);
+}
+function bindViewport() {
+  vp.addEventListener('scroll', updateParallax, { passive: true });
+  vp.addEventListener('pointerdown', e => {
+    hideHint();
+    if (e.pointerType !== 'mouse' || e.button !== 0) return;   // touch uses native swipe-scrolling
+    drag = { x: e.clientX, sl: vp.scrollLeft };
+    dragged = false;
+  });
+  addEventListener('pointermove', e => {
+    if (!drag) return;
+    const dx = e.clientX - drag.x;
+    if (!dragged && Math.abs(dx) > 5) { dragged = true; vp.classList.add('dragging'); }
+    if (dragged) vp.scrollLeft = drag.sl - dx;
+  });
+  const endDrag = () => { drag = null; vp.classList.remove('dragging'); setTimeout(() => { dragged = false; }, 0); };
+  addEventListener('pointerup', endDrag);
+  addEventListener('pointercancel', endDrag);
+  vp.addEventListener('wheel', e => {
+    hideHint();
+    if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { vp.scrollLeft += e.deltaY; e.preventDefault(); }
+  }, { passive: false });
+  vp.addEventListener('keydown', hideHint);
+  addEventListener('resize', () => layout());
+  setTimeout(hideHint, 16000);
+}
+
+/* =====================================================================
+   12. BOOT — build the scene, then lift the veil as the layers rise
+   ===================================================================== */
+function safe(name, fn) { try { fn(); } catch (err) { console.error(`[darbar] ${name} failed:`, err); } }
+function boot() {
+  [['defs', buildDefs], ['sky', buildSky], ['far', buildFar], ['mid', buildMid], ['garden', buildGarden],
+   ['actors', buildActors], ['life', buildLife], ['fore', buildFore], ['lights', buildLights], ['crowd', buildCrowd],
+   ['ui', buildUI], ['viewport', bindViewport]].forEach(([name, fn]) => safe(name, fn));
+  safe('layout', () => layout(1200));
+  safe('namaz', startNamaz);
+  safe('leaves', startLeaves);
+  requestAnimationFrame(t => { lastT = t; requestAnimationFrame(frame); });
+  // let "Bismillah" rest a moment, then fade the veil while each layer fades up behind it
+  setTimeout(() => {
+    document.body.classList.add('loaded');
+    const v = $('#veil');
+    if (v) { v.style.opacity = '0'; v.style.pointerEvents = 'none'; setTimeout(() => v.remove(), 2000); }
+  }, 1100);
+}
+boot();
+</script>
+</body>
+</html>
